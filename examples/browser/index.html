@@ -1,0 +1,14 @@
+<!doctype html>
+<html><head><title>unilog browser example</title></head>
+<body>
+<script>window.__UNILOG_SERVICE_NAME__ = 'checkout-web';</script>
+<script src="../../js/src/browser.js"></script>
+<script>
+  unilog.setTransport(function (record) {
+    // Wire this to your own collector endpoint — there is no bundled one by design.
+    console.log('[transport would send]', record);
+  });
+  console.info('Subscription updated');
+  console.error('User not found', new Error('lookup failed'));
+</script>
+</body></html>
