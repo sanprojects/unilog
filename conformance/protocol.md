@@ -34,10 +34,9 @@ A **driver** (`conformance/impls/<lang>/driver.*`) is a small program that:
 2. Parses each line as JSON, validates it against `spec/record.schema.json`.
 3. Normalizes volatile fields before comparing (`normalize.yaml`):
    `timestamp`, `resource.host.name`, `resource.process.pid`,
-   `resource.service.instance.id`, `resource.service.name`,
-   `resource.service.version` (these are legitimately
-   environment/language-dependent — see spec §3 — and are not part of what
-   conformance checks).
+   `resource.service.instance.id`, `resource.service.name` (these are
+   legitimately environment/language-dependent — see spec §3 — and are not
+   part of what conformance checks).
 4. Diffs the remaining structure across all drivers that ran; any mismatch
    fails the case and prints a unified diff.
 

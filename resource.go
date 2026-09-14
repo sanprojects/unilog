@@ -24,8 +24,6 @@ func uuidV4() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
-const sdkVersion = "0.1.0"
-
 // Resource is a resolved resource block, ready to embed verbatim in every record.
 type Resource map[string]any
 
@@ -33,7 +31,6 @@ type Resource map[string]any
 // priority source, spec §3.1 step 1).
 type ResourceConfig struct {
 	ServiceName      string
-	ServiceVersion   string
 	ServiceNamespace string
 	Environment      string
 }
@@ -69,35 +66,12 @@ func executableBasename() string {
 	return "go"
 }
 
-func buildInfoServiceNameVersion() (string, string) {
+func buildInfoServiceName() string {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
-		return "", ""
+		return ""
 	}
-	name := filepath.Base(info.Main.Path)
-	version := info.Main.Version
-	if version == "(devel)" || version == "" {
-		var revision string
-		var modified bool
-		for _, s := range info.Settings {
-			switch s.Key {
-			case "vcs.revision":
-				revision = s.Value
-			case "vcs.modified":
-				modified = s.Value == "true"
-			}
-		}
-		if revision != "" {
-			if len(revision) > 12 {
-				revision = revision[:12]
-			}
-			version = revision
-			if modified {
-				version += "+dirty"
-			}
-		}
-	}
-	return name, version
+	return filepath.Base(info.Main.Path)
 }
 
 func resolveResource(cfg ResourceConfig) Resource {
@@ -107,10 +81,9 @@ func resolveResource(cfg ResourceConfig) Resource {
 		otelAttrs = map[string]string{}
 	}
 
-	buildName, buildVersion := buildInfoServiceNameVersion()
+	buildName := buildInfoServiceName()
 
 	serviceName := firstNonEmpty(cfg.ServiceName, os.Getenv("OTEL_SERVICE_NAME"), otelAttrs["service.name"], buildName, "unknown_service:"+executableBasename())
-	serviceVersion := firstNonEmpty(cfg.ServiceVersion, otelAttrs["service.version"], buildVersion)
 	serviceNamespace := firstNonEmpty(cfg.ServiceNamespace, os.Getenv("LOG_SERVICE_NAMESPACE"), otelAttrs["service.namespace"])
 	deploymentEnv := firstNonEmpty(cfg.Environment, os.Getenv("LOG_ENV"), otelAttrs["deployment.environment.name"])
 
@@ -129,9 +102,6 @@ func resolveResource(cfg ResourceConfig) Resource {
 	}
 
 	res := Resource{"service.name": serviceName}
-	if serviceVersion != "" {
-		res["service.version"] = serviceVersion
-	}
 	if serviceNamespace != "" {
 		res["service.namespace"] = serviceNamespace
 	}
@@ -142,9 +112,6 @@ func resolveResource(cfg ResourceConfig) Resource {
 	if hostName != "" {
 		res["host.name"] = hostName
 	}
-	res["telemetry.sdk.name"] = "unilog"
-	res["telemetry.sdk.version"] = sdkVersion
-	res["telemetry.sdk.language"] = "go"
 	if os.Getenv("LOG_RESOURCE_PROCESS") != "0" {
 		res["process.pid"] = os.Getpid()
 	}
@@ -152,7 +119,7 @@ func resolveResource(cfg ResourceConfig) Resource {
 		res[k] = v
 	}
 	for k, v := range otelAttrs {
-		if _, known := res[k]; !known && k != "service.name" && k != "service.version" && k != "service.namespace" && k != "deployment.environment.name" {
+		if _, known := res[k]; !known && k != "service.name" && k != "service.namespace" && k != "deployment.environment.name" {
 			res[k] = v
 		}
 	}

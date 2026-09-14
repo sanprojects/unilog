@@ -19,8 +19,7 @@ SCHEMA_PATH = os.path.join(ROOT, "spec", "record.schema.json")
 
 VOLATILE_TOP = ["timestamp"]
 VOLATILE_RESOURCE = [
-    "host.name", "process.pid", "service.instance.id",
-    "service.name", "service.version", "telemetry.sdk.language",
+    "host.name", "process.pid", "service.instance.id", "service.name",
 ]
 # The caller-trace feature (spec: code.function/filepath/lineno/stacktrace)
 # is correct-by-design to differ across drivers — each driver.<ext> is

@@ -13,11 +13,9 @@
     1: 'TRACE', 5: 'DEBUG', 9: 'INFO', 13: 'WARN', 17: 'ERROR', 21: 'FATAL',
   };
   var CONSOLE_SEVERITY = { trace: 1, debug: 5, log: 9, info: 9, warn: 13, error: 17 };
-  var SDK_VERSION = '0.1.0';
 
   var config = {
     serviceName: global.__UNILOG_SERVICE_NAME__ || 'unknown_service:browser',
-    serviceVersion: global.__UNILOG_SERVICE_VERSION__ || undefined,
     environment: global.__UNILOG_ENV__ || undefined,
     redact: true,
   };
@@ -54,11 +52,7 @@
     var r = {
       'service.name': config.serviceName,
       'service.instance.id': instanceId,
-      'telemetry.sdk.name': 'unilog',
-      'telemetry.sdk.version': SDK_VERSION,
-      'telemetry.sdk.language': 'webjs',
     };
-    if (config.serviceVersion) r['service.version'] = config.serviceVersion;
     if (config.environment) r['deployment.environment.name'] = config.environment;
     return r;
   }

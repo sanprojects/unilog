@@ -16,6 +16,7 @@ listed here, with the OTel reference and how reversible the deviation is.
 | V8 | `app.duration_ms` in milliseconds | Semconv measures duration with histograms, in seconds | `app.*` is our own namespace; milliseconds is what people actually read in a log line | Yes |
 | V9 | `scope` is a plain string | `InstrumentationScope{name, version, attributes}` | No instrumenting libraries to distinguish | Narrowing |
 | V10 | `event_name` is a JSON key | `EventName` is a `LogRecord` field ([data-model.md#field-eventname](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/logs/data-model.md)) | Same thing, different container | Yes |
+| V11 | No `resource.service.version`, no `telemetry.sdk.*` | Both defined by semconv ([resource/README.md](https://github.com/open-telemetry/semantic-conventions/blob/main/docs/resource/README.md)) | `telemetry.sdk.*` is constant per process (name/version are the library's own, language is implied by the record shape) — pure repetition, not information. `service.version` degraded to noise in practice: unversioned internal services report nothing meaningful (Composer's own placeholder for an unpublished package, `1.0.0+no-version-set`, was the concrete trigger) | Yes, re-add per field if a consumer ever needs it |
 
-All ten are intentional and stable for `logspec 1.0`. A `logspec 2.0` could adopt OTLP/JSON
+All eleven are intentional and stable for `logspec 1.0`. A `logspec 2.0` could adopt OTLP/JSON
 directly; that would be a `MAJOR` bump per `spec/record.schema.json`.

@@ -7,8 +7,6 @@ const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 
-const SDK_VERSION = '0.1.0';
-
 function parseOtelResourceAttributes(raw) {
   const out = {};
   if (!raw) return out;
@@ -78,11 +76,9 @@ function resolve(explicit = {}) {
 
   const pkg = nearestPackageJson(process.argv[1]);
   const pkgName = pkg && pkg.name ? pkg.name.replace(/^@[^/]+\//, '') : null;
-  const pkgVersion = pkg && pkg.version;
 
   const serviceName =
     explicit.serviceName || env.OTEL_SERVICE_NAME || otelAttrs['service.name'] || pkgName || `unknown_service:${executableBasename()}`;
-  const serviceVersion = explicit.serviceVersion || otelAttrs['service.version'] || pkgVersion;
   const serviceNamespace = explicit.serviceNamespace || env.LOG_SERVICE_NAMESPACE || otelAttrs['service.namespace'];
   const deploymentEnv = explicit.deploymentEnvironment || env.LOG_ENV || otelAttrs['deployment.environment.name'];
 
@@ -106,20 +102,16 @@ function resolve(explicit = {}) {
   const strategy = env.LOG_INSTANCE_ID_STRATEGY || 'auto';
 
   const resource = { 'service.name': serviceName };
-  if (serviceVersion) resource['service.version'] = serviceVersion;
   if (serviceNamespace) resource['service.namespace'] = serviceNamespace;
   const iid = instanceId(strategy, k8s, hostName);
   if (iid) resource['service.instance.id'] = iid;
   if (deploymentEnv) resource['deployment.environment.name'] = deploymentEnv;
   if (hostName) resource['host.name'] = hostName;
-  resource['telemetry.sdk.name'] = 'unilog';
-  resource['telemetry.sdk.version'] = SDK_VERSION;
-  resource['telemetry.sdk.language'] = typeof Bun !== 'undefined' ? 'bun' : 'nodejs';
   if (env.LOG_RESOURCE_PROCESS !== '0') resource['process.pid'] = process.pid;
   Object.assign(resource, k8s);
 
   for (const [k, v] of Object.entries(otelAttrs)) {
-    if (!(k in resource) && !['service.name', 'service.version', 'service.namespace', 'deployment.environment.name'].includes(k)) {
+    if (!(k in resource) && !['service.name', 'service.namespace', 'deployment.environment.name'].includes(k)) {
       resource[k] = v;
     }
   }

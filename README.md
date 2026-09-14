@@ -12,7 +12,7 @@ logging.error('User not found', {'id': 123})
 ```
 
 ```json
-{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"service.name":"unknown_service:app.py","telemetry.sdk.name":"unilog","telemetry.sdk.version":"0.1.0","telemetry.sdk.language":"python","process.pid":4211},"attributes":{"id":123}}
+{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"service.name":"unknown_service:app.py","process.pid":4211},"attributes":{"id":123}}
 ```
 
 Format spec: [spec/](spec/) · deviations from OpenTelemetry: [spec/DEVIATIONS.md](spec/DEVIATIONS.md) ·

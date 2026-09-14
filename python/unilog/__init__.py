@@ -21,7 +21,7 @@ __version__ = "0.1.0"
 
 def configure(**explicit_resource: object) -> None:
     """Install (if not already) and override resource fields explicitly,
-    e.g. unilog.configure(service_name='billing-api', service_version='1.8.3')."""
+    e.g. unilog.configure(service_name='billing-api')."""
     from . import _resource
 
     _resource._cached = _resource.resolve(explicit_resource)

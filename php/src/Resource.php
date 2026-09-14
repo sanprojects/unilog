@@ -11,8 +11,6 @@ namespace Unilog;
  */
 final class Resource
 {
-    private const SDK_VERSION = '0.1.0';
-
     /** @var array<string, mixed>|null */
     private static ?array $cached = null;
     private static ?int $cachedPid = null;
@@ -66,10 +64,10 @@ final class Resource
         return basename((string) $script) ?: 'php';
     }
 
-    private static function composerServiceNameVersion(): array
+    private static function composerServiceName(): ?string
     {
         if (!class_exists(\Composer\InstalledVersions::class)) {
-            return [null, null];
+            return null;
         }
         try {
             $root = \Composer\InstalledVersions::getRootPackage();
@@ -77,10 +75,9 @@ final class Resource
             if ($name !== null && str_contains($name, '/')) {
                 $name = substr($name, strpos($name, '/') + 1);
             }
-            $version = \Composer\InstalledVersions::getPrettyVersion($root['name'] ?? '') ?: null;
-            return [$name, $version];
+            return $name;
         } catch (\Throwable) {
-            return [null, null];
+            return null;
         }
     }
 
@@ -122,7 +119,7 @@ final class Resource
         }
         $otelAttrs ??= [];
 
-        [$pkgName, $pkgVersion] = self::composerServiceNameVersion();
+        $pkgName = self::composerServiceName();
 
         $otelServiceName = getenv('OTEL_SERVICE_NAME');
         $serviceName = self::$explicit['service_name']
@@ -130,7 +127,6 @@ final class Resource
             ?? ($otelAttrs['service.name'] ?? null)
             ?? $pkgName
             ?? ('unknown_service:' . self::executableBasename());
-        $serviceVersion = self::$explicit['service_version'] ?? ($otelAttrs['service.version'] ?? null) ?? $pkgVersion;
         $logServiceNamespace = getenv('LOG_SERVICE_NAMESPACE');
         $serviceNamespace = self::$explicit['service_namespace'] ?? ($logServiceNamespace !== false ? $logServiceNamespace : null) ?? ($otelAttrs['service.namespace'] ?? null);
         $logEnv = getenv('LOG_ENV');
@@ -155,9 +151,6 @@ final class Resource
         $strategy = Env::str('LOG_INSTANCE_ID_STRATEGY', 'auto');
 
         $resource = ['service.name' => $serviceName];
-        if ($serviceVersion) {
-            $resource['service.version'] = $serviceVersion;
-        }
         if ($serviceNamespace) {
             $resource['service.namespace'] = $serviceNamespace;
         }
@@ -171,9 +164,6 @@ final class Resource
         if ($hostName) {
             $resource['host.name'] = $hostName;
         }
-        $resource['telemetry.sdk.name'] = 'unilog';
-        $resource['telemetry.sdk.version'] = self::SDK_VERSION;
-        $resource['telemetry.sdk.language'] = 'php';
         if (Env::flag('LOG_RESOURCE_PROCESS')) {
             $resource['process.pid'] = getmypid() ?: 0;
         }
@@ -181,7 +171,7 @@ final class Resource
             $resource[$k] = $v;
         }
         foreach ($otelAttrs as $k => $v) {
-            if (!isset($resource[$k]) && !in_array($k, ['service.name', 'service.version', 'service.namespace', 'deployment.environment.name'], true)) {
+            if (!isset($resource[$k]) && !in_array($k, ['service.name', 'service.namespace', 'deployment.environment.name'], true)) {
                 $resource[$k] = $v;
             }
         }
