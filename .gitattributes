@@ -1,0 +1,6 @@
+# Keep the repo root clean for Composer/npm: they always fetch the whole
+# archive, so trim what a PHP/Node consumer never needs.
+/examples export-ignore
+/conformance export-ignore
+/.github export-ignore
+*.md -export-ignore

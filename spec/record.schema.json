@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/sanprojects/unilog/spec/record.schema.json",
+  "title": "unilog log record (logspec 1.0)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["timestamp", "severity_text", "severity_number", "body", "resource"],
+  "propertyOrder": [
+    "timestamp", "severity_text", "severity_number", "event_name", "body",
+    "trace_id", "span_id", "trace_flags", "scope", "resource", "attributes",
+    "dropped_attributes_count"
+  ],
+  "properties": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{6}Z$",
+      "description": "RFC3339, UTC only, exactly 6 fractional digits (microseconds), suffix Z."
+    },
+    "severity_text": {
+      "type": "string",
+      "enum": [
+        "TRACE", "TRACE2", "TRACE3", "TRACE4",
+        "DEBUG", "DEBUG2", "DEBUG3", "DEBUG4",
+        "INFO", "INFO2", "INFO3", "INFO4",
+        "WARN", "WARN2", "WARN3", "WARN4",
+        "ERROR", "ERROR2", "ERROR3", "ERROR4",
+        "FATAL", "FATAL2", "FATAL3", "FATAL4"
+      ]
+    },
+    "severity_number": { "type": "integer", "minimum": 1, "maximum": 24 },
+    "event_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "maxLength": 63
+    },
+    "body": { "type": "string" },
+    "trace_id": { "type": "string", "pattern": "^(?!0{32}$)[0-9a-f]{32}$" },
+    "span_id": { "type": "string", "pattern": "^(?!0{16}$)[0-9a-f]{16}$" },
+    "trace_flags": { "type": "string", "pattern": "^[0-9a-f]{2}$" },
+    "scope": { "type": "string", "maxLength": 255 },
+    "resource": {
+      "type": "object",
+      "required": ["service.name"],
+      "properties": {
+        "service.name": { "type": "string", "minLength": 1 },
+        "service.version": { "type": "string" },
+        "service.namespace": { "type": "string" },
+        "service.instance.id": { "type": "string" },
+        "deployment.environment.name": { "type": "string" },
+        "host.name": { "type": "string" },
+        "telemetry.sdk.name": { "type": "string" },
+        "telemetry.sdk.version": { "type": "string" },
+        "telemetry.sdk.language": { "type": "string" },
+        "process.pid": { "type": "integer" },
+        "k8s.namespace.name": { "type": "string" },
+        "k8s.pod.name": { "type": "string" },
+        "k8s.container.name": { "type": "string" },
+        "k8s.node.name": { "type": "string" },
+        "container.id": { "type": "string" }
+      },
+      "additionalProperties": { "type": ["string", "number", "boolean"] }
+    },
+    "attributes": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": true
+    },
+    "dropped_attributes_count": { "type": "integer", "exclusiveMinimum": 0 }
+  }
+}
