@@ -79,7 +79,12 @@ func newRedactor() *Redactor {
 }
 
 func keySegments(key string) map[string]bool {
-	spaced := camelBoundary.ReplaceAllString(key, "$1_$2")
+	// Go's regexp replacement syntax treats "$1_" as a reference to a named
+	// group called "1_" (digits+underscore are valid name chars), NOT as
+	// "group 1, then a literal underscore" — verified: "$1_$2" silently
+	// swallowed group 1 entirely ("cardNumber" -> "carNumber"). ${1}_${2}
+	// disambiguates the group boundary from the underscore.
+	spaced := camelBoundary.ReplaceAllString(key, "${1}_${2}")
 	segs := map[string]bool{}
 	for _, s := range segmentSplit.Split(spaced, -1) {
 		if s != "" {

@@ -1,0 +1,11 @@
+{
+  "name": "nested_attributes",
+  "input": {
+    "severityNumber": 9,
+    "body": "nested structures flatten but keep their shape",
+    "attributes": {
+      "http": { "method": "POST", "status": 502 },
+      "tags": [1, 2, 3]
+    }
+  }
+}

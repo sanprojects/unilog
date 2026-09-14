@@ -1,0 +1,8 @@
+{
+  "name": "invalid_event_name_dropped",
+  "input": {
+    "severityNumber": 9,
+    "body": "event_name without a dot must be dropped, not emitted invalid",
+    "eventName": "nodotssegment"
+  }
+}

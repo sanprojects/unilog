@@ -1,0 +1,9 @@
+{
+  "name": "error_with_attributes",
+  "input": {
+    "severityNumber": 17,
+    "body": "Payment charge failed",
+    "eventName": "payment.charge.failed",
+    "attributes": { "order_id": 42, "http.response.status_code": 502, "app.duration_ms": 184 }
+  }
+}

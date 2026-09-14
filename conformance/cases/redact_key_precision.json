@@ -1,0 +1,12 @@
+{
+  "name": "redact_key_precision",
+  "input": {
+    "severityNumber": 9,
+    "body": "segment matching, not substring",
+    "attributes": {
+      "cardinality": "should NOT be redacted (single segment != card)",
+      "cardNumber": "should be redacted (camelCase splits to card+Number)",
+      "passwordless_login": "should NOT be redacted (passwordless != password)"
+    }
+  }
+}

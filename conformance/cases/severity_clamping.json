@@ -1,0 +1,4 @@
+{
+  "name": "severity_clamping",
+  "input": { "severityNumber": 999, "body": "out of range severity clamps to 24" }
+}
