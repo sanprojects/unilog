@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Mapping
 
-from . import _context, _record, _resource, _severity
+from . import _caller, _context, _record, _resource, _severity
 from ._sinks import Sinks
 
 # Attributes every LogRecord carries natively — anything else on the record
@@ -37,6 +37,14 @@ class Handler(logging.Handler):
 
         body = record.getMessage()
         attrs: dict[str, Any] = {}
+
+        # Ambient scope (request method/url, worker path/attrs — see
+        # unilog.scope()/request_scope()/worker_scope()) and a short caller
+        # trace both go in first, at the lowest priority: anything the call
+        # site itself provides below should be able to override them.
+        attrs.update(_context.current_scope_attrs())
+        if _caller.enabled():
+            attrs.update(_caller.caller_attributes())
 
         # The example from the original request:
         #   logging.error('User not found', {'id': 123})
@@ -80,12 +88,14 @@ class Handler(logging.Handler):
 def emit_raw(sinks: Sinks, *, severity_number: int, body: str, event_name: str, attributes: dict[str, Any] | None = None) -> None:
     """Used by the excepthook/unraisablehook/asyncio paths, which have no LogRecord."""
     trace_id, span_id, trace_flags = _context.current()
+    attrs = dict(_context.current_scope_attrs())
+    attrs.update(attributes or {})
     rec = _record.build(
         severity_number=severity_number,
         body=body,
         event_name=event_name,
         resource=_resource.get(),
-        attributes=attributes,
+        attributes=attrs,
         trace_id=trace_id,
         span_id=span_id,
         trace_flags=trace_flags,

@@ -1,6 +1,7 @@
 package unilog
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -69,20 +70,51 @@ type BuildOptions struct {
 	SpanID         string
 	TraceFlags     string
 	Scope          string
+	// Context, when set, fills TraceID/SpanID/TraceFlags from WithTrace (if
+	// not already set above) and merges WithScope/RequestScope/WorkerScope
+	// attributes plus a short caller trace at the lowest priority — the
+	// same enrichment slog.Handler.Handle does automatically for
+	// slog.InfoContext(ctx, ...). Needed here too for callers that build a
+	// Record directly (unilog.Emit, httpmw's panic path) instead of going
+	// through slog.
+	Context context.Context
 }
 
 func Build(opt BuildOptions) Record {
 	sev := clampSeverity(opt.SeverityNumber)
-	attrs, dropped := normalizeAttributes(opt.Attributes)
+
+	attributes := opt.Attributes
+	traceID, spanID, traceFlags := opt.TraceID, opt.SpanID, opt.TraceFlags
+	if opt.Context != nil || callerInfoEnabled() {
+		merged := map[string]any{}
+		if opt.Context != nil {
+			for k, v := range scopeFromContext(opt.Context) {
+				merged[k] = v
+			}
+		}
+		if callerInfoEnabled() {
+			for k, v := range callerAttributes(callerTraceFrames()) {
+				merged[k] = v
+			}
+		}
+		for k, v := range attributes {
+			merged[k] = v
+		}
+		attributes = merged
+		if opt.Context != nil && traceID == "" {
+			traceID, spanID, traceFlags = fromContext(opt.Context)
+		}
+	}
+	attrs, dropped := normalizeAttributes(attributes)
 
 	rec := Record{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
 		SeverityText:     severityTextFor(sev),
 		SeverityNumber:   sev,
 		Body:             truncateBytes(globalRedactor.RedactValuePatterns(opt.Body), bodyLimit),
-		TraceID:          opt.TraceID,
-		SpanID:           opt.SpanID,
-		TraceFlags:       opt.TraceFlags,
+		TraceID:          traceID,
+		SpanID:           spanID,
+		TraceFlags:       traceFlags,
 		Resource:         GetResource(),
 		Attributes:       attrs,
 		DroppedAttrCount: dropped,

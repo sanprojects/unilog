@@ -6,6 +6,7 @@ const record = require('./record.cjs');
 const severity = require('./severity.cjs');
 const resourceMod = require('./resource.cjs');
 const context = require('./context.cjs');
+const caller = require('./caller.cjs');
 const { Sinks } = require('./sinks.cjs');
 
 const INSTALL_KEY = Symbol.for('unilog.installed');
@@ -32,8 +33,15 @@ function detectMode() {
 
 function emitRecord(sinks, opts) {
   const ctx = context.current();
+  // Ambient scope (requestScope/workerScope/scope) and a short caller trace
+  // both go in first, at the lowest priority — opts.attributes overrides them.
+  const enrichedAttrs = { ...context.currentScopeAttrs() };
+  if (caller.enabled()) Object.assign(enrichedAttrs, caller.callerAttributes());
+  Object.assign(enrichedAttrs, opts.attributes);
+
   const rec = record.build({
     ...opts,
+    attributes: enrichedAttrs,
     resource: resourceMod.get(),
     traceId: opts.traceId || ctx.traceId,
     spanId: opts.spanId || ctx.spanId,

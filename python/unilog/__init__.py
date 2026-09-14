@@ -9,9 +9,12 @@ See https://github.com/sanprojects/unilog for the format spec.
 from __future__ import annotations
 
 from . import _install
-from ._context import parse_traceparent, set_trace, submit, thread
+from ._context import parse_traceparent, request_scope, scope, set_trace, submit, thread, worker_scope
 
-__all__ = ["configure", "rearm", "disable", "set_trace", "parse_traceparent", "thread", "submit"]
+__all__ = [
+    "configure", "rearm", "disable", "set_trace", "parse_traceparent", "thread", "submit",
+    "scope", "request_scope", "worker_scope",
+]
 
 __version__ = "0.1.0"
 

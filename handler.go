@@ -50,6 +50,9 @@ func (h *Handler) Enabled(_ context.Context, level slog.Level) bool {
 }
 
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
+	// Ambient scope (WithScope/RequestScope/WorkerScope) and a short caller
+	// trace are merged in by Build() itself (via BuildOptions.Context) at
+	// the lowest priority — explicit attrs collected below override them.
 	attrs := map[string]any{}
 	for k, v := range h.baseAttrs {
 		attrs[k] = v
@@ -76,16 +79,12 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 		}
 	}
 
-	traceID, spanID, traceFlags := fromContext(ctx)
-
 	rec := Build(BuildOptions{
 		SeverityNumber: severityNumber,
 		Body:           r.Message,
 		EventName:      eventName,
 		Attributes:     attrs,
-		TraceID:        traceID,
-		SpanID:         spanID,
-		TraceFlags:     traceFlags,
+		Context:        ctx,
 	})
 	h.sinks.Emit(rec.JSONLine(), severityNumber)
 	return nil
