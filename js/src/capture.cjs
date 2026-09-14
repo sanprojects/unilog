@@ -3,7 +3,6 @@
 
 const util = require('node:util');
 const record = require('./record.cjs');
-const severity = require('./severity.cjs');
 const resourceMod = require('./resource.cjs');
 const context = require('./context.cjs');
 const caller = require('./caller.cjs');
@@ -47,7 +46,7 @@ function emitRecord(sinks, opts) {
     spanId: opts.spanId || ctx.spanId,
     traceFlags: opts.traceFlags || ctx.traceFlags,
   });
-  sinks.emit(record.toJsonLine(rec), rec.severity_number, severity.syslogPriority);
+  sinks.emit(record.toJsonLine(rec), rec.severity_number);
 }
 
 function errorToOpts(err, severityNumber, eventName) {

@@ -90,8 +90,14 @@ final class Sinks
         $fd = $this->routeStream($severityNumber);
 
         if (!$usedNative && $this->syslogWanted && getenv('JOURNAL_STREAM') !== false) {
-            $pri = Severity::syslogPriority($severityNumber, $this->facility);
-            @fwrite($fd, "<{$pri}>{$line}");
+            // systemd's own stdout/stderr "log level prefix" is NOT a real
+            // syslog PRI (facility*8+severity) — it's the bare severity
+            // digit 0-7 only. Verified empirically on the actual host:
+            // `<3>msg` via systemd-run parses to PRIORITY=3 with the prefix
+            // stripped from MESSAGE; `<14>msg` (the real syslog PRI
+            // encoding) is not recognized at all.
+            $sev = Severity::syslogSeverity($severityNumber);
+            @fwrite($fd, "<{$sev}>{$line}");
             return;
         }
         if ($this->syslogWanted && !$usedNative && !$this->warnedNoSyslog) {

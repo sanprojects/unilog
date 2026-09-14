@@ -144,8 +144,14 @@ func (s *Sinks) Emit(line []byte, severityNumber int) {
 
 	f := s.routeFD(severityNumber)
 	if !usedNative && s.syslogEnabled && os.Getenv("JOURNAL_STREAM") != "" {
-		pri := syslogPriority(severityNumber, s.facility)
-		prefixed := append([]byte(fmt.Sprintf("<%d>", pri)), line...)
+		// systemd's own stdout/stderr "log level prefix" is NOT a real
+		// syslog PRI (facility*8+severity) — it's the bare severity digit
+		// 0-7 only. Verified empirically on the actual host: `<3>msg` via
+		// systemd-run parses to PRIORITY=3 with the prefix stripped from
+		// MESSAGE; `<14>msg` (facility=user(1)<<3|severity, the real syslog
+		// PRI encoding) is not recognized at all.
+		sev := syslogSeverityFor(severityNumber)
+		prefixed := append([]byte(fmt.Sprintf("<%d>", sev)), line...)
 		_, _ = f.Write(prefixed)
 		return
 	}

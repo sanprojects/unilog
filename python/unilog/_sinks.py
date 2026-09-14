@@ -90,8 +90,14 @@ class Sinks:
 
         if self.console_enabled:
             if not use_native and self.syslog_enabled and os.environ.get("JOURNAL_STREAM"):
-                pri = _severity.syslog_priority(severity_number, self._facility)
-                prefixed = f"<{pri}>".encode("ascii") + data
+                # systemd's own stdout/stderr "log level prefix" is NOT a
+                # real syslog PRI (facility*8+severity) — it's the bare
+                # severity digit 0-7 only. Verified empirically on the
+                # actual host: `<3>msg` via systemd-run parses to
+                # PRIORITY=3 with the prefix stripped from MESSAGE; `<14>msg`
+                # (the real syslog PRI encoding) is not recognized at all.
+                _text, sev = _severity.text_and_syslog(severity_number)
+                prefixed = f"<{sev}>".encode("ascii") + data
                 self._write(fd, prefixed)
             else:
                 if self.syslog_enabled and not use_native and not self._warned_no_syslog:

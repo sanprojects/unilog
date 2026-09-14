@@ -4,6 +4,7 @@
 // journald <N>-prefix path, or console-only with one diagnostic line.
 
 const fs = require('node:fs');
+const severity = require('./severity.cjs');
 
 class Sinks {
   constructor(env = process.env) {
@@ -37,7 +38,7 @@ class Sinks {
     return this.maxRecordBytes;
   }
 
-  emit(line, severityNumber, syslogPriorityFn) {
+  emit(line, severityNumber) {
     if (!this.consoleEnabled) return;
     const max = this._maxBytes();
     let data = Buffer.from(line, 'utf8');
@@ -47,8 +48,15 @@ class Sinks {
     const fd = this._routeFd(severityNumber);
 
     if (this.journaldAvailable) {
-      const pri = syslogPriorityFn(severityNumber, this.facility);
-      const prefixed = Buffer.concat([Buffer.from(`<${pri}>`), data]);
+      // systemd's own stdout/stderr "log level prefix" is NOT a real syslog
+      // PRI (facility*8+severity) — it's the bare severity digit 0-7 only.
+      // Verified empirically on the actual host: `<3>msg` via systemd-run
+      // parses to PRIORITY=3 with the prefix stripped from MESSAGE; `<14>msg`
+      // (this package's facility=user(1)<<3|severity, the real syslog PRI
+      // encoding) is NOT recognized at all — falls through to journald's
+      // default priority with the literal "<14>" text left in MESSAGE.
+      const [, sev] = severity.textAndSyslog(severityNumber);
+      const prefixed = Buffer.concat([Buffer.from(`<${sev}>`), data]);
       this._write(fd, prefixed);
       return;
     }
