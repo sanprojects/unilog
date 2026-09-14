@@ -7,6 +7,7 @@ namespace Unilog\Monolog;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
+use Unilog\Caller;
 use Unilog\Installer;
 use Unilog\Record;
 use Unilog\Severity;
@@ -37,8 +38,17 @@ final class UnilogHandler extends AbstractProcessingHandler
             unset($context['event_name']);
         }
 
+        // Short caller trace, lowest priority. Caveat: by the time write() runs,
+        // we're several Monolog-internal frames away from the user's original
+        // $logger->error() call — our own-package filter still applies, but
+        // the nearest frame it finds may be inside Monolog rather than real
+        // application code. If MonoLog's own IntrospectionProcessor is
+        // configured, its file/line/class/function in $record->extra is more
+        // accurate and overrides this below (Monolog puts it there itself).
+        $attributes = Caller::enabled() ? Caller::attributes() : [];
+        $attributes = [...$attributes, ...$context];
+
         $exception = $context['exception'] ?? null;
-        $attributes = $context;
         if ($exception instanceof \Throwable) {
             unset($attributes['exception']);
             $attributes = array_merge($attributes, Record::exceptionAttributes($exception, $severityNumber));

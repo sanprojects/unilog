@@ -38,7 +38,7 @@ final class Installer
         }
         self::$installed = true;
 
-        if ((getenv('UNILOG_DISABLE') ?: '0') === '1') {
+        if (getenv('UNILOG_DISABLE') === '1') {
             self::$installed = false; // stays "not installed" so a later explicit install() still works
             return;
         }
@@ -79,12 +79,12 @@ final class Installer
 
     private static function debug(): bool
     {
-        return (getenv('LOG_DEBUG') ?: '0') === '1';
+        return getenv('LOG_DEBUG') === '1';
     }
 
     private static function ignoreVendorDeprecations(): bool
     {
-        return (getenv('LOG_PHP_IGNORE_VENDOR_DEPRECATIONS') ?: '1') === '1';
+        return Env::flag('LOG_PHP_IGNORE_VENDOR_DEPRECATIONS');
     }
 
     private static function errorHandler(int $errno, string $errstr, string $errfile = '', int $errline = 0): bool
@@ -148,12 +148,19 @@ final class Installer
         self::emit($severityNumber, $e->getMessage() ?: $e::class, 'application.exception', Record::exceptionAttributes($e, $severityNumber));
     }
 
-    /** @param array<string, mixed> $attributes */
+    /** @param array<string, mixed> $attributes
+     * No generic caller-trace here on purpose: every caller of this method
+     * (errorHandler/exceptionHandler/shutdownHandler/logThrowable) already
+     * passes PHP's own, more accurate code.filepath/code.lineno for the
+     * error/exception itself — a second, generic stack walk would just be
+     * noise. Ambient scope (request/worker) still applies: a fatal mid-request
+     * should still show which request it happened in. */
     private static function emit(int $severityNumber, string $body, string $eventName, array $attributes = []): void
     {
         if (self::$sinks === null) {
             return;
         }
+        $attributes = [...Context::currentScopeAttrs(), ...$attributes];
         [$traceId, $spanId, $traceFlags] = Context::current();
         $record = Record::build([
             'severityNumber' => $severityNumber,

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Unilog;
 
 /**
- * Trace context. A plain `static` works for Workerman-style workers (one
+ * Trace context, plus generic scope attributes (request method/url, worker
+ * path/attrs, or anything else) attached to every unilog call made while a
+ * scope is active. A plain `static` works for Workerman-style workers (one
  * request per worker process at a time) but is a real race under Swoole,
  * where coroutines in the same worker run concurrently — so this branches on
  * whether a Swoole coroutine is actually active, per spec §4 (PHP).
@@ -15,6 +17,8 @@ final class Context
     private static ?string $staticTraceId = null;
     private static ?string $staticSpanId = null;
     private static ?string $staticTraceFlags = null;
+    /** @var array<string, mixed> */
+    private static array $staticAttrs = [];
 
     private const TRACEPARENT_RE = '/^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/';
 
@@ -36,9 +40,66 @@ final class Context
     public static function current(): array
     {
         if (self::inCoroutine()) {
-            return self::coroutineCurrent(\Swoole\Coroutine::getCid());
+            [$traceId, $spanId, $traceFlags] = self::coroutineCurrent(\Swoole\Coroutine::getCid());
+            return [$traceId, $spanId, $traceFlags];
         }
         return [self::$staticTraceId, self::$staticSpanId, self::$staticTraceFlags];
+    }
+
+    /** @return array<string, mixed> */
+    public static function currentScopeAttrs(): array
+    {
+        if (self::inCoroutine()) {
+            return self::coroutineScopeAttrs(\Swoole\Coroutine::getCid());
+        }
+        return self::$staticAttrs;
+    }
+
+    /**
+     * Run $fn with $attrs merged into the current scope for its duration
+     * (PHP has no `with` statement, so this is the equivalent of Python's
+     * context manager / Node's runScope). Nests: an inner scope's keys win
+     * over an outer one's; restores the previous scope in a finally, even
+     * if $fn throws.
+     *
+     *   Context::withScope(['http.request.method' => 'POST', 'url.full' => $url], fn() => handle($request));
+     *
+     * @param array<string, mixed> $attrs
+     */
+    public static function withScope(array $attrs, callable $fn): mixed
+    {
+        [$prevTraceId, $prevSpanId, $prevTraceFlags] = self::current();
+        $prevAttrs = self::currentScopeAttrs();
+        self::set($prevTraceId, $prevSpanId, $prevTraceFlags);
+        self::setScopeAttrs([...$prevAttrs, ...$attrs]);
+        try {
+            return $fn();
+        } finally {
+            self::setScopeAttrs($prevAttrs);
+        }
+    }
+
+    /** with-style helper for an HTTP request: */
+    public static function withRequestScope(string $method, string $url, callable $fn): mixed
+    {
+        return self::withScope(['http.request.method' => $method, 'url.full' => $url], $fn);
+    }
+
+    /** with-style helper for a background job/worker: */
+    public static function withWorkerScope(string $path, array $attrs, callable $fn): mixed
+    {
+        return self::withScope(['worker.path' => $path, ...$attrs], $fn);
+    }
+
+    /** @param array<string, mixed> $attrs */
+    private static function setScopeAttrs(array $attrs): void
+    {
+        if (self::inCoroutine()) {
+            $ctx = \Swoole\Coroutine::getContext();
+            $ctx['unilog.attrs'] = $attrs;
+            return;
+        }
+        self::$staticAttrs = $attrs;
     }
 
     /**
@@ -58,6 +119,19 @@ final class Context
             $cid = \Swoole\Coroutine::getPcid($cid) ?: 0;
         }
         return [null, null, null];
+    }
+
+    /** @return array<string, mixed> */
+    private static function coroutineScopeAttrs(int $cid): array
+    {
+        for ($i = 0; $cid > 0 && $i < 64; $i++) {
+            $ctx = \Swoole\Coroutine::getContext($cid);
+            if ($ctx !== null && isset($ctx['unilog.attrs'])) {
+                return $ctx['unilog.attrs'];
+            }
+            $cid = \Swoole\Coroutine::getPcid($cid) ?: 0;
+        }
+        return [];
     }
 
     private static function inCoroutine(): bool

@@ -6,6 +6,7 @@ namespace Unilog\Psr3;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\LoggerTrait;
+use Unilog\Caller;
 use Unilog\Installer;
 use Unilog\Record;
 use Unilog\Severity;
@@ -40,8 +41,13 @@ final class Logger implements LoggerInterface
             unset($context['event_name']);
         }
 
+        // Short caller trace, lowest priority — anything in $context overrides
+        // it below. Ambient scope (request/worker) is merged centrally by
+        // Installer::emit(), not here.
+        $attributes = Caller::enabled() ? Caller::attributes() : [];
+        $attributes = [...$attributes, ...$context];
+
         $exception = $context['exception'] ?? null;
-        $attributes = $context;
         if ($exception instanceof \Throwable) {
             unset($attributes['exception']);
             $attributes = array_merge($attributes, Record::exceptionAttributes($exception, $severityNumber));

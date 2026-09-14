@@ -114,7 +114,7 @@ final class Resource
     /** @return array<string, mixed> */
     private static function resolve(): array
     {
-        $rawOtel = (string) (getenv('OTEL_RESOURCE_ATTRIBUTES') ?: '');
+        $rawOtel = Env::str('OTEL_RESOURCE_ATTRIBUTES', '');
         $otelAttrs = self::parseOtelResourceAttributes($rawOtel);
         if ($rawOtel !== '' && $otelAttrs === null) {
             fwrite(\STDERR, "unilog: OTEL_RESOURCE_ATTRIBUTES is malformed, ignoring it entirely\n");
@@ -124,16 +124,20 @@ final class Resource
 
         [$pkgName, $pkgVersion] = self::composerServiceNameVersion();
 
+        $otelServiceName = getenv('OTEL_SERVICE_NAME');
         $serviceName = self::$explicit['service_name']
-            ?? (getenv('OTEL_SERVICE_NAME') ?: null)
+            ?? ($otelServiceName !== false ? $otelServiceName : null)
             ?? ($otelAttrs['service.name'] ?? null)
             ?? $pkgName
             ?? ('unknown_service:' . self::executableBasename());
         $serviceVersion = self::$explicit['service_version'] ?? ($otelAttrs['service.version'] ?? null) ?? $pkgVersion;
-        $serviceNamespace = self::$explicit['service_namespace'] ?? (getenv('LOG_SERVICE_NAMESPACE') ?: null) ?? ($otelAttrs['service.namespace'] ?? null);
-        $deploymentEnv = self::$explicit['deployment_environment'] ?? (getenv('LOG_ENV') ?: null) ?? ($otelAttrs['deployment.environment.name'] ?? null);
+        $logServiceNamespace = getenv('LOG_SERVICE_NAMESPACE');
+        $serviceNamespace = self::$explicit['service_namespace'] ?? ($logServiceNamespace !== false ? $logServiceNamespace : null) ?? ($otelAttrs['service.namespace'] ?? null);
+        $logEnv = getenv('LOG_ENV');
+        $deploymentEnv = self::$explicit['deployment_environment'] ?? ($logEnv !== false ? $logEnv : null) ?? ($otelAttrs['deployment.environment.name'] ?? null);
 
-        $hostName = @gethostname() ?: (getenv('HOSTNAME') ?: null);
+        $hostNameEnv = getenv('HOSTNAME');
+        $hostName = @gethostname() ?: ($hostNameEnv !== false ? $hostNameEnv : null);
 
         $k8s = [];
         foreach ([
@@ -148,7 +152,7 @@ final class Resource
             }
         }
 
-        $strategy = (string) (getenv('LOG_INSTANCE_ID_STRATEGY') ?: 'auto');
+        $strategy = Env::str('LOG_INSTANCE_ID_STRATEGY', 'auto');
 
         $resource = ['service.name' => $serviceName];
         if ($serviceVersion) {
@@ -170,7 +174,7 @@ final class Resource
         $resource['telemetry.sdk.name'] = 'unilog';
         $resource['telemetry.sdk.version'] = self::SDK_VERSION;
         $resource['telemetry.sdk.language'] = 'php';
-        if ((getenv('LOG_RESOURCE_PROCESS') ?: '1') !== '0') {
+        if (Env::flag('LOG_RESOURCE_PROCESS')) {
             $resource['process.pid'] = getmypid() ?: 0;
         }
         foreach ($k8s as $k => $v) {

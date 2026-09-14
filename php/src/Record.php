@@ -19,12 +19,6 @@ final class Record
         return self::$redactor ??= new Redactor();
     }
 
-    private static function envInt(string $name, int $default): int
-    {
-        $v = getenv($name);
-        return $v !== false && $v !== '' && is_numeric($v) ? (int) $v : $default;
-    }
-
     private static function truncate(string $s, int $limit): string
     {
         if (strlen($s) <= $limit) {
@@ -41,7 +35,7 @@ final class Record
     public static function build(array $opts): array
     {
         $redactor = self::redactor();
-        $bodyLimit = self::envInt('LOG_BODY_LIMIT', 8192);
+        $bodyLimit = Env::int('LOG_BODY_LIMIT', 8192);
 
         $sev = Severity::clamp((int) ($opts['severityNumber'] ?? 9));
 
@@ -107,7 +101,7 @@ final class Record
         if (count($raw) === 0) {
             return [null, 0];
         }
-        $maxAttrs = self::envInt('LOG_MAX_ATTRIBUTES', 128);
+        $maxAttrs = Env::int('LOG_MAX_ATTRIBUTES', 128);
         $flat = [];
         foreach ($raw as $rawKey => $v) {
             $key = (string) $rawKey;
@@ -140,7 +134,7 @@ final class Record
         if ($depth > 10) {
             return '[MaxDepth]';
         }
-        $maxAttrBytes = self::envInt('LOG_MAX_ATTRIBUTE_BYTES', 4096);
+        $maxAttrBytes = Env::int('LOG_MAX_ATTRIBUTE_BYTES', 4096);
 
         if ($v === null || is_bool($v) || is_int($v)) {
             return $v;
@@ -203,8 +197,8 @@ final class Record
     public static function exceptionAttributes(\Throwable $e, int $severityNumber): array
     {
         $redactor = self::redactor();
-        $stacktraceMin = self::envInt('LOG_STACKTRACE_MIN_SEVERITY', 17);
-        $maxCauses = self::envInt('LOG_EXCEPTION_MAX_CAUSES', 3);
+        $stacktraceMin = Env::int('LOG_STACKTRACE_MIN_SEVERITY', 17);
+        $maxCauses = Env::int('LOG_EXCEPTION_MAX_CAUSES', 3);
 
         $etype = $e::class;
         $attrs = [
@@ -239,7 +233,7 @@ final class Record
     /** @param array<string, mixed> $record */
     public static function toJsonLine(array $record): string
     {
-        $asciiOnly = (getenv('LOG_ASCII_ONLY') ?: '0') === '1';
+        $asciiOnly = getenv('LOG_ASCII_ONLY') === '1';
         $flags = \JSON_UNESCAPED_SLASHES | ($asciiOnly ? 0 : \JSON_UNESCAPED_UNICODE);
         $json = json_encode($record, $flags);
         if ($json === false) {

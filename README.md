@@ -57,6 +57,30 @@ PHP's composer.json needs the VCS source added once:
 Full breakdown, including what nothing can catch (SIGKILL, OOM-killer, native crashes): see
 each language's `auto`/`install` module docstring.
 
+## Every record gets a short caller trace
+
+Not just exceptions — every regular log call carries `code.function`/`code.filepath`/
+`code.lineno` for the immediate call site, plus `code.stacktrace`: up to `LOG_CALLER_TRACE_FRAMES`
+(default 3) frames above it, closest first, skipping this package's own frames (and, for PHP,
+well-known wrapper libraries like `psr/log`'s `LoggerTrait` and Monolog). Disable with
+`LOG_CALLER_INFO=0` if the stack walk shows up in a profile.
+
+## Request and worker scope
+
+Attach attributes to every unilog call made for the duration of a request or a background job —
+the same mechanism `trace_id`/`span_id` already use, so it survives however deep the call goes:
+
+| Language | Request | Worker |
+|---|---|---|
+| Python | `with unilog.request_scope(method, url): ...` | `with unilog.worker_scope(path, **attrs): ...` |
+| Go | `ctx = unilog.RequestScope(ctx, method, url)` (or `httpmw.Middleware`, done automatically) | `ctx = unilog.WorkerScope(ctx, path, attrs)` |
+| Node | `unilog.requestScope(method, url, fn)` (or `unilog.middleware()`, done automatically) | `unilog.workerScope(path, attrs, fn)` |
+| PHP | `Context::withRequestScope($method, $url, fn)` | `Context::withWorkerScope($path, $attrs, fn)` |
+
+Both are thin wrappers over a generic `scope()`/`WithScope()`/`withScope()` — use that directly for
+anything else. Scopes nest (inner wins on key collision); an attribute passed to a specific log
+call always wins over ambient scope or caller data.
+
 ## Repository layout
 
 ```

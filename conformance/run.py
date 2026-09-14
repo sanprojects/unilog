@@ -22,6 +22,19 @@ VOLATILE_RESOURCE = [
     "host.name", "process.pid", "service.instance.id",
     "service.name", "service.version", "telemetry.sdk.language",
 ]
+# The caller-trace feature (spec: code.function/filepath/lineno/stacktrace)
+# is correct-by-design to differ across drivers — each driver.<ext> is
+# itself the call site Build() sees, in a different file, language and
+# function name. Masked to a placeholder (not popped): this still verifies
+# every language actually produces the feature, just not its driver-specific
+# text.
+VOLATILE_ATTRIBUTES = ["code.function", "code.filepath", "code.lineno"]
+# code.stacktrace is popped outright rather than masked: whether a SECOND
+# frame even exists above the driver's own call site depends on how much
+# runtime bootstrap machinery (go run's runtime.main, node's module-loader
+# wrapper, ...) sits above main() in each language — that's an artifact of
+# how each driver happens to be invoked, not a guarantee the format makes.
+DROPPED_ATTRIBUTES = ["code.stacktrace"]
 
 DRIVERS = {
     "python": {
@@ -57,6 +70,14 @@ def normalize(record: dict) -> dict:
         # still leave "key present" vs "key absent" as a spurious diff.
         for k in VOLATILE_RESOURCE:
             rec["resource"].pop(k, None)
+    if "attributes" in rec:
+        for k in VOLATILE_ATTRIBUTES:
+            if k in rec["attributes"]:
+                rec["attributes"][k] = "<VOLATILE>"
+        for k in DROPPED_ATTRIBUTES:
+            rec["attributes"].pop(k, None)
+        if not rec["attributes"]:
+            del rec["attributes"]
     return rec
 
 
@@ -72,8 +93,14 @@ def load_schema_validator():
 
 def run_driver(lang: str, case_path: str) -> tuple[bool, str]:
     cmd = DRIVERS[lang]["cmd"](case_path)
+    # Caller-info (code.function/filepath/lineno/stacktrace) is correct-by-
+    # design to differ across drivers — each driver.<ext> is itself a
+    # different call site. Off by default here so today's cases don't need
+    # VOLATILE_ATTRIBUTES masking just to pass; a case can still turn it back
+    # on via its own "env" (applied by the driver after this base env).
+    env = {**os.environ, "LOG_CALLER_INFO": "0"}
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=ROOT)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30, cwd=ROOT, env=env)
     except Exception as e:
         return False, f"driver crashed to launch: {e}"
     if proc.returncode != 0:

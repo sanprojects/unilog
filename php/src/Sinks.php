@@ -26,10 +26,10 @@ final class Sinks
 
     public function __construct(private readonly string $serviceName)
     {
-        $sinkList = (string) (getenv('LOG_SINK') ?: 'console+syslog');
+        $sinkList = Env::str('LOG_SINK', 'console+syslog');
         $this->consoleEnabled = str_contains($sinkList, 'console');
         $this->syslogWanted = str_contains($sinkList, 'syslog') && \function_exists('openlog');
-        $facilityName = (string) (getenv('LOG_SYSLOG_FACILITY') ?: 'user');
+        $facilityName = Env::str('LOG_SYSLOG_FACILITY', 'user');
         $this->facility = self::FACILITIES[$facilityName] ?? 1;
 
         if ($this->syslogWanted) {
@@ -39,7 +39,7 @@ final class Sinks
 
     private function routeStream(int $severityNumber)
     {
-        $thr = (string) (getenv('LOG_STDERR_MIN_SEVERITY') ?: '17');
+        $thr = Env::str('LOG_STDERR_MIN_SEVERITY', '17');
         if ($thr === 'OFF') {
             return \STDOUT;
         }
@@ -52,8 +52,8 @@ final class Sinks
 
     private function maxBytes(): int
     {
-        $default = (int) (getenv('LOG_MAX_RECORD_BYTES') ?: 65536);
-        $mode = (string) (getenv('LOG_ATOMIC_PIPE') ?: 'auto');
+        $default = Env::int('LOG_MAX_RECORD_BYTES', 65536);
+        $mode = Env::str('LOG_ATOMIC_PIPE', 'auto');
         if ($mode === '0') {
             return $default;
         }

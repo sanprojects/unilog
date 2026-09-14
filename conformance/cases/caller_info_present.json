@@ -1,0 +1,8 @@
+{
+  "name": "caller_info_present",
+  "env": { "LOG_CALLER_INFO": "1" },
+  "input": {
+    "severityNumber": 9,
+    "body": "every implementation must attach code.function/filepath/lineno when LOG_CALLER_INFO=1"
+  }
+}

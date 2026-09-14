@@ -46,20 +46,20 @@ final class Redactor
 
     public function __construct()
     {
-        $this->enabled = ($_ENV['LOG_REDACT'] ?? getenv('LOG_REDACT') ?: '1') !== '0';
-        $this->mode = (string) (getenv('LOG_REDACT_MODE') ?: 'mask');
-        $this->hashKey = (string) (getenv('LOG_REDACT_HASH_KEY') ?: '');
+        $this->enabled = Env::flag('LOG_REDACT');
+        $this->mode = Env::str('LOG_REDACT_MODE', 'mask');
+        $this->hashKey = Env::str('LOG_REDACT_HASH_KEY', '');
         $this->keySegments = self::DEFAULT_KEY_SEGMENTS;
         if (getenv('LOG_REDACT_PROFILE') === 'pii') {
             $this->keySegments += self::PII_KEY_SEGMENTS;
         }
-        foreach (explode(',', (string) (getenv('LOG_REDACT_ALLOW') ?: '')) as $allowed) {
+        foreach (explode(',', Env::str('LOG_REDACT_ALLOW', '')) as $allowed) {
             $allowed = strtolower(trim($allowed));
             if ($allowed !== '') {
                 unset($this->keySegments[$allowed]);
             }
         }
-        $this->redactStacktrace = (getenv('LOG_REDACT_STACKTRACE') ?: '1') !== '0';
+        $this->redactStacktrace = Env::flag('LOG_REDACT_STACKTRACE');
     }
 
     /** @return list<string> */
