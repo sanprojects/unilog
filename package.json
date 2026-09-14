@@ -1,0 +1,24 @@
+{
+  "name": "unilog",
+  "version": "0.1.0",
+  "description": "Zero-config OTel-shaped structured logging for Node.js, Bun and the browser.",
+  "license": "MIT",
+  "repository": "github:sanprojects/unilog",
+  "main": "js/src/index.cjs",
+  "exports": {
+    ".": "./js/src/index.cjs",
+    "./auto": "./js/src/auto.mjs",
+    "./preload": "./js/src/auto.mjs",
+    "./pino": "./js/src/pino-transport.cjs",
+    "./winston": "./js/src/winston-transport.cjs",
+    "./browser": "./js/src/browser.js",
+    "./package.json": "./package.json"
+  },
+  "files": ["js/src", "js/dist"],
+  "engines": { "node": ">=18.19" },
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "test": "node --test js/test"
+  }
+}
