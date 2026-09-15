@@ -115,7 +115,7 @@ def resolve(explicit: dict[str, object] | None = None) -> dict[str, object]:
         if v:
             k8s[attr] = v
 
-    strategy = env.get("LOG_INSTANCE_ID_STRATEGY", "auto")
+    strategy = env.get("LOG_INSTANCE_ID_STRATEGY", "none")
     instance_id = _instance_id(strategy, k8s, host_name)
 
     resource: dict[str, object] = {"service.name": service_name}
@@ -125,9 +125,13 @@ def resolve(explicit: dict[str, object] | None = None) -> dict[str, object]:
         resource["service.instance.id"] = instance_id
     if deployment_env:
         resource["deployment.environment.name"] = deployment_env
-    if host_name:
+    # host.name/process.pid/service.instance.id (above) default OFF: on a
+    # single-host deployment they're the same value on every record - true,
+    # but not information. Opt in per field when they'd actually distinguish
+    # something (multiple hosts, multiple workers on one host, ...).
+    if env.get("LOG_RESOURCE_HOST") == "1" and host_name:
         resource["host.name"] = host_name
-    if env.get("LOG_RESOURCE_PROCESS", "1") != "0":
+    if env.get("LOG_RESOURCE_PROCESS") == "1":
         resource["process.pid"] = os.getpid()
     if env.get("LOG_RESOURCE_COMMAND", "1") != "0":
         resource["command"] = _command_line(host_name)

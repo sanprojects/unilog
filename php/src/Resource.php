@@ -190,7 +190,7 @@ final class Resource
             }
         }
 
-        $strategy = Env::str('LOG_INSTANCE_ID_STRATEGY', 'auto');
+        $strategy = Env::str('LOG_INSTANCE_ID_STRATEGY', 'none');
 
         $resource = ['service.name' => $serviceName];
         if ($serviceNamespace) {
@@ -203,10 +203,15 @@ final class Resource
         if ($deploymentEnv) {
             $resource['deployment.environment.name'] = $deploymentEnv;
         }
-        if ($hostName) {
+        // host.name/process.pid/service.instance.id (above) default OFF: on a
+        // single-host deployment they're the same value on every record -
+        // true, but not information. Opt in per field when they'd actually
+        // distinguish something (multiple hosts, multiple workers on one
+        // host, ...).
+        if (Env::flag('LOG_RESOURCE_HOST', false) && $hostName) {
             $resource['host.name'] = $hostName;
         }
-        if (Env::flag('LOG_RESOURCE_PROCESS')) {
+        if (Env::flag('LOG_RESOURCE_PROCESS', false)) {
             $resource['process.pid'] = getmypid() ?: 0;
         }
         if (Env::flag('LOG_RESOURCE_COMMAND')) {

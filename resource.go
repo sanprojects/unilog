@@ -127,14 +127,21 @@ func resolveResource(cfg ResourceConfig) Resource {
 	if serviceNamespace != "" {
 		res["service.namespace"] = serviceNamespace
 	}
-	res["service.instance.id"] = instanceID(k8s, hostName)
+	if iid := instanceID(k8s, hostName); iid != "" {
+		res["service.instance.id"] = iid
+	}
 	if deploymentEnv != "" {
 		res["deployment.environment.name"] = deploymentEnv
 	}
-	if hostName != "" {
+	// host.name/process.pid/service.instance.id (via LOG_INSTANCE_ID_STRATEGY
+	// below) default OFF: on a single-host deployment they're the same value
+	// on every record - true, but not information. Opt in per field when
+	// they'd actually distinguish something (multiple hosts, multiple
+	// workers on one host, ...).
+	if os.Getenv("LOG_RESOURCE_HOST") == "1" && hostName != "" {
 		res["host.name"] = hostName
 	}
-	if os.Getenv("LOG_RESOURCE_PROCESS") != "0" {
+	if os.Getenv("LOG_RESOURCE_PROCESS") == "1" {
 		res["process.pid"] = os.Getpid()
 	}
 	if os.Getenv("LOG_RESOURCE_COMMAND") != "0" {
@@ -152,7 +159,7 @@ func resolveResource(cfg ResourceConfig) Resource {
 }
 
 func instanceID(k8s map[string]string, hostName string) string {
-	strategy := getenvDefault("LOG_INSTANCE_ID_STRATEGY", "auto")
+	strategy := getenvDefault("LOG_INSTANCE_ID_STRATEGY", "none")
 	switch strategy {
 	case "none":
 		return ""

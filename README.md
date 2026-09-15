@@ -12,8 +12,13 @@ logging.error('User not found', {'id': 123})
 ```
 
 ```json
-{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"command":"api-1> cd /srv/app; python3 app.py","service.name":"unknown_service:app.py","process.pid":4211},"attributes":{"id":123}}
+{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"command":"api-1> cd /srv/app; python3 app.py","service.name":"unknown_service:app.py"},"attributes":{"id":123}}
 ```
+
+`resource.host.name`/`process.pid`/`service.instance.id` are off by default — on a single-host
+deployment they're the same value on every record, true but not information. Opt in with
+`LOG_RESOURCE_HOST=1`, `LOG_RESOURCE_PROCESS=1`, `LOG_INSTANCE_ID_STRATEGY=auto` (or `uuid`/
+`host-pid`) when they'd actually distinguish something — multiple hosts, multiple workers on one.
 
 Format spec: [spec/](spec/) · deviations from OpenTelemetry: [spec/DEVIATIONS.md](spec/DEVIATIONS.md) ·
 what each runtime catches and what it can't: below.

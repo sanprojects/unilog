@@ -119,15 +119,19 @@ function resolve(explicit = {}) {
     if (v) k8s[attr] = v;
   }
 
-  const strategy = env.LOG_INSTANCE_ID_STRATEGY || 'auto';
+  const strategy = env.LOG_INSTANCE_ID_STRATEGY || 'none';
 
   const resource = { 'service.name': serviceName };
   if (serviceNamespace) resource['service.namespace'] = serviceNamespace;
   const iid = instanceId(strategy, k8s, hostName);
   if (iid) resource['service.instance.id'] = iid;
   if (deploymentEnv) resource['deployment.environment.name'] = deploymentEnv;
-  if (hostName) resource['host.name'] = hostName;
-  if (env.LOG_RESOURCE_PROCESS !== '0') resource['process.pid'] = process.pid;
+  // host.name/process.pid/service.instance.id (above) default OFF: on a
+  // single-host deployment they're the same value on every record - true,
+  // but not information. Opt in per field when they'd actually distinguish
+  // something (multiple hosts, multiple workers on one host, ...).
+  if (env.LOG_RESOURCE_HOST === '1' && hostName) resource['host.name'] = hostName;
+  if (env.LOG_RESOURCE_PROCESS === '1') resource['process.pid'] = process.pid;
   if (env.LOG_RESOURCE_COMMAND !== '0') resource['command'] = commandLine(hostName);
   Object.assign(resource, k8s);
 
