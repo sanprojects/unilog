@@ -21,11 +21,17 @@ const opts = testCase.input;
 const attributes = caller.enabled() ? caller.callerAttributes() : {};
 Object.assign(attributes, opts.attributes);
 
+if (opts.requestScope) {
+  attributes['http.request.method'] = opts.requestScope.method;
+  attributes['url.full'] = opts.requestScope.url;
+}
+const resource = resourceMod.withRequestUrl(resourceMod.get(), attributes);
+
 const rec = record.build({
   severityNumber: opts.severityNumber ?? 9,
   body: opts.body ?? '',
   eventName: opts.eventName,
-  resource: resourceMod.get(),
+  resource,
   attributes,
   traceId: opts.traceId,
   spanId: opts.spanId,

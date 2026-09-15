@@ -8,6 +8,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -25,6 +26,10 @@ type caseFile struct {
 		Attributes     map[string]any `json:"attributes"`
 		TraceID        string         `json:"traceId"`
 		SpanID         string         `json:"spanId"`
+		RequestScope   *struct {
+			Method string `json:"method"`
+			URL    string `json:"url"`
+		} `json:"requestScope"`
 	} `json:"input"`
 }
 
@@ -60,13 +65,17 @@ func main() {
 	if sev == 0 {
 		sev = 9
 	}
-	rec := unilog.Build(unilog.BuildOptions{
+	opts := unilog.BuildOptions{
 		SeverityNumber: sev,
 		Body:           c.Input.Body,
 		EventName:      c.Input.EventName,
 		Attributes:     c.Input.Attributes,
 		TraceID:        c.Input.TraceID,
 		SpanID:         c.Input.SpanID,
-	})
+	}
+	if rs := c.Input.RequestScope; rs != nil {
+		opts.Context = unilog.RequestScope(context.Background(), rs.Method, rs.URL)
+	}
+	rec := unilog.Build(opts)
 	os.Stdout.Write(rec.JSONLine())
 }

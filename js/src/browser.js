@@ -54,6 +54,14 @@
       'service.instance.id': instanceId,
     };
     if (config.environment) r['deployment.environment.name'] = config.environment;
+    // Every record here happens on some page, unlike a server call that may
+    // or may not be inside a request — so unlike resource.URL server-side
+    // (spec V12), this is unconditional, not scope-gated. No method prefix:
+    // unlike a server request, there's no reliable way to know how this page
+    // was reached (a link, a form POST, pushState).
+    try {
+      r.URL = location.href;
+    } catch (e) { /* no location (unusual embedding) */ }
     return r;
   }
 

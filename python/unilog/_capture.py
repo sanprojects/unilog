@@ -70,12 +70,13 @@ class Handler(logging.Handler):
                 attrs.update(_record.exception_to_attributes(exc, severity_number))
 
         trace_id, span_id, trace_flags = _context.current()
+        resource = _resource.with_request_url(_resource.get(), attrs)
 
         rec = _record.build(
             severity_number=severity_number,
             body=body,
             event_name=event_name,
-            resource=_resource.get(),
+            resource=resource,
             attributes=attrs,
             trace_id=trace_id,
             span_id=span_id,
@@ -90,11 +91,12 @@ def emit_raw(sinks: Sinks, *, severity_number: int, body: str, event_name: str, 
     trace_id, span_id, trace_flags = _context.current()
     attrs = dict(_context.current_scope_attrs())
     attrs.update(attributes or {})
+    resource = _resource.with_request_url(_resource.get(), attrs)
     rec = _record.build(
         severity_number=severity_number,
         body=body,
         event_name=event_name,
-        resource=_resource.get(),
+        resource=resource,
         attributes=attrs,
         trace_id=trace_id,
         span_id=span_id,

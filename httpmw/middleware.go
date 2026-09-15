@@ -2,9 +2,9 @@
 // panics (without crashing the process — that's the difference from
 // unilog.Recover, meant for main()), logs them structurally, threads an
 // incoming W3C traceparent header into the request's log context, and
-// attaches http.request.method/url.full to every log call made while
-// handling the request (unilog.RequestScope) — so a plain
-// slog.InfoContext(r.Context(), "...") inside the handler carries them
+// attaches the request (unilog.RequestScope) to every log call made while
+// handling it — surfaced as resource.URL (spec V12) — so a plain
+// slog.InfoContext(r.Context(), "...") inside the handler carries it
 // automatically, with no logging code in the handler itself.
 package httpmw
 
@@ -29,7 +29,7 @@ func Middleware(next http.Handler) http.Handler {
 				ctx = unilog.WithTrace(ctx, traceID, spanID, flags)
 			}
 		}
-		ctx = unilog.RequestScope(ctx, r.Method, r.URL.String())
+		ctx = unilog.RequestScope(ctx, r.Method, fullRequestURL(r))
 		r = r.WithContext(ctx)
 
 		defer func() {
@@ -63,4 +63,22 @@ func Middleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// fullRequestURL reconstructs scheme+host+path+query for an incoming
+// request: r.URL on the server side normally carries only path+query (no
+// scheme/host - those aren't on the wire in a plain HTTP request line), and
+// sanstv terminates TLS at the edge (Angie) then proxies plain HTTP to this
+// process, so r.TLS is always nil here too. X-Forwarded-Proto is the only
+// place "https" survives that hop; default to it since every real request
+// this service sees arrives through that edge.
+func fullRequestURL(r *http.Request) string {
+	scheme := r.Header.Get("X-Forwarded-Proto")
+	if scheme == "" {
+		scheme = "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+	}
+	return scheme + "://" + r.Host + r.URL.RequestURI()
 }

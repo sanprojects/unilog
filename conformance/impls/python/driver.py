@@ -20,11 +20,17 @@ opts = case["input"]
 attributes = dict(_caller.caller_attributes()) if _caller.enabled() else {}
 attributes.update(opts.get("attributes") or {})
 
+request_scope = opts.get("requestScope")
+if request_scope:
+    attributes["http.request.method"] = request_scope["method"]
+    attributes["url.full"] = request_scope["url"]
+resource = _resource.with_request_url(_resource.get(), attributes)
+
 rec = _record.build(
     severity_number=opts.get("severityNumber", 9),
     body=opts.get("body", ""),
     event_name=opts.get("eventName"),
-    resource=_resource.get(),
+    resource=resource,
     attributes=attributes,
     trace_id=opts.get("traceId"),
     span_id=opts.get("spanId"),

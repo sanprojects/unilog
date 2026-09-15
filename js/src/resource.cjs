@@ -6,6 +6,26 @@ const os = require('node:os');
 const path = require('node:path');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
+const { Redactor } = require('./redact.cjs');
+
+const redactor = new Redactor();
+
+// commandLine reconstructs "how to run this again": hostname> cd <dir>;
+// <argv, executable shortened to its basename>. Human-facing, not
+// machine-parsed — spec deviation V12. Value-pattern redacted like body,
+// since argv can carry a secret (a flag value) the way any other free-form
+// string can.
+function commandLine(hostName) {
+  let cwd;
+  try {
+    cwd = process.cwd();
+  } catch {
+    cwd = '?';
+  }
+  const argv = process.argv.slice(1);
+  argv.unshift(path.basename(process.argv[0] || (typeof Bun !== 'undefined' ? 'bun' : 'node')));
+  return redactor.redactValuePatterns(`${hostName || '?'}> cd ${cwd}; ${argv.join(' ')}`);
+}
 
 function parseOtelResourceAttributes(raw) {
   const out = {};
@@ -108,6 +128,7 @@ function resolve(explicit = {}) {
   if (deploymentEnv) resource['deployment.environment.name'] = deploymentEnv;
   if (hostName) resource['host.name'] = hostName;
   if (env.LOG_RESOURCE_PROCESS !== '0') resource['process.pid'] = process.pid;
+  if (env.LOG_RESOURCE_COMMAND !== '0') resource['command'] = commandLine(hostName);
   Object.assign(resource, k8s);
 
   for (const [k, v] of Object.entries(otelAttrs)) {
@@ -135,4 +156,18 @@ function get() {
   return _cached;
 }
 
-module.exports = { resolve, get, configure };
+// Pops http.request.method/url.full (unilog.requestScope) out of attrs and,
+// if both were present, returns a resource copy with them folded into a
+// single resource.URL — spec V12, same reasoning as resource.command. Leaves
+// resource/attrs untouched (returns resource as-is) when no request scope is
+// active.
+function withRequestUrl(resource, attrs) {
+  const method = attrs['http.request.method'];
+  const url = attrs['url.full'];
+  if (typeof method !== 'string' || typeof url !== 'string') return resource;
+  delete attrs['http.request.method'];
+  delete attrs['url.full'];
+  return { ...resource, URL: `${method} ${url}` };
+}
+
+module.exports = { resolve, get, configure, withRequestUrl };

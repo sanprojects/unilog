@@ -35,6 +35,29 @@ final class Resource
         return self::$cached;
     }
 
+    /**
+     * Pops http.request.method/url.full (Context::withRequestScope) out of
+     * $attributes and, if both were present, returns a resource copy with
+     * them folded into a single resource["URL"] — spec V12, same reasoning
+     * as resource.command. Leaves $resource/$attributes untouched when no
+     * request scope is active.
+     *
+     * @param array<string, mixed> $resource
+     * @param array<string, mixed> $attributes
+     * @return array<string, mixed>
+     */
+    public static function withRequestUrl(array $resource, array &$attributes): array
+    {
+        $method = $attributes['http.request.method'] ?? null;
+        $url = $attributes['url.full'] ?? null;
+        if (!is_string($method) || !is_string($url)) {
+            return $resource;
+        }
+        unset($attributes['http.request.method'], $attributes['url.full']);
+        $resource['URL'] = $method . ' ' . $url;
+        return $resource;
+    }
+
     /** @return array<string, string>|null null means "malformed, drop the whole var" */
     private static function parseOtelResourceAttributes(string $raw): ?array
     {
@@ -62,6 +85,25 @@ final class Resource
     {
         $script = $_SERVER['SCRIPT_NAME'] ?? $_SERVER['SCRIPT_FILENAME'] ?? $_SERVER['argv'][0] ?? 'php';
         return basename((string) $script) ?: 'php';
+    }
+
+    /** "how to run this again": hostname> cd <dir>; <argv, executable
+     * shortened to its basename>. Human-facing, not machine-parsed — spec
+     * deviation V12. Value-pattern redacted like body, since argv can carry
+     * a secret (a flag value) the way any other free-form string can. */
+    private static function commandLine(?string $hostName): string
+    {
+        $cwd = getcwd() ?: '?';
+        $argv = $_SERVER['argv'] ?? null;
+        if (is_array($argv) && $argv !== []) {
+            $parts = array_values($argv);
+            $parts[0] = basename((string) $parts[0]);
+            array_unshift($parts, basename(PHP_BINARY));
+            $cmd = implode(' ', $parts);
+        } else {
+            $cmd = basename(PHP_SAPI === 'cli' ? PHP_BINARY : (PHP_SAPI ?: 'php'));
+        }
+        return (new Redactor())->redactValuePatterns(($hostName ?: '?') . '> cd ' . $cwd . '; ' . $cmd);
     }
 
     private static function composerServiceName(): ?string
@@ -166,6 +208,9 @@ final class Resource
         }
         if (Env::flag('LOG_RESOURCE_PROCESS')) {
             $resource['process.pid'] = getmypid() ?: 0;
+        }
+        if (Env::flag('LOG_RESOURCE_COMMAND')) {
+            $resource['command'] = self::commandLine($hostName);
         }
         foreach ($k8s as $k => $v) {
             $resource[$k] = $v;

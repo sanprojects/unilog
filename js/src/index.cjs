@@ -52,17 +52,28 @@ function workerScope(path, attrs, fn) {
 function middleware() {
   return (req, res, next) => {
     const tp = parseTraceparent(req.headers && req.headers.traceparent);
-    const url = req.originalUrl || req.url || '';
     context.runScope(
       {
         traceId: tp ? tp.traceId : undefined,
         spanId: tp ? tp.spanId : undefined,
         traceFlags: tp ? tp.traceFlags : undefined,
-        attrs: { 'http.request.method': req.method, 'url.full': url },
+        attrs: { 'http.request.method': req.method, 'url.full': fullRequestUrl(req) },
       },
       next
     );
   };
+}
+
+// fullRequestUrl reconstructs scheme+host+path+query: req.url/originalUrl on
+// the server side normally carries only path+query (no scheme/host — those
+// aren't on the wire in a plain HTTP request line). X-Forwarded-Proto/Host
+// are what survive a TLS-terminating edge proxy hop; req.socket.encrypted
+// covers a direct TLS listener with no proxy in front.
+function fullRequestUrl(req) {
+  const headers = req.headers || {};
+  const scheme = headers['x-forwarded-proto'] || (req.socket && req.socket.encrypted ? 'https' : 'http');
+  const host = headers['x-forwarded-host'] || headers.host || 'unknown';
+  return `${scheme}://${host}${req.originalUrl || req.url || ''}`;
 }
 
 /** Low-level: build+emit one record directly, bypassing console entirely.

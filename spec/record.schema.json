@@ -48,6 +48,8 @@
         "deployment.environment.name": { "type": "string" },
         "host.name": { "type": "string" },
         "process.pid": { "type": "integer" },
+        "command": { "type": "string" },
+        "URL": { "type": "string" },
         "k8s.namespace.name": { "type": "string" },
         "k8s.pod.name": { "type": "string" },
         "k8s.container.name": { "type": "string" },

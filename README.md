@@ -12,7 +12,7 @@ logging.error('User not found', {'id': 123})
 ```
 
 ```json
-{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"service.name":"unknown_service:app.py","process.pid":4211},"attributes":{"id":123}}
+{"timestamp":"2026-09-14T14:35:42.123456Z","severity_text":"ERROR","severity_number":17,"body":"User not found","resource":{"command":"api-1> cd /srv/app; python3 app.py","service.name":"unknown_service:app.py","process.pid":4211},"attributes":{"id":123}}
 ```
 
 Format spec: [spec/](spec/) · deviations from OpenTelemetry: [spec/DEVIATIONS.md](spec/DEVIATIONS.md) ·
@@ -80,6 +80,14 @@ the same mechanism `trace_id`/`span_id` already use, so it survives however deep
 Both are thin wrappers over a generic `scope()`/`WithScope()`/`withScope()` — use that directly for
 anything else. Scopes nest (inner wins on key collision); an attribute passed to a specific log
 call always wins over ambient scope or caller data.
+
+A request scope's `method`/`url` don't stay as attributes: they fold into a single
+`resource.URL` (`"GET https://sanstv.ru/find_words?word=test"`) on every record made during that
+request — spec deviation [V12](spec/DEVIATIONS.md). `resource.command` (`"host> cd dir; argv"`)
+is unconditional, process-wide — "how do I run this again" for whoever's staring at the log line.
+Both are `LOG_RESOURCE_COMMAND`/redaction-covered like every other free-form string in a record;
+see [DEVIATIONS.md](spec/DEVIATIONS.md) for what that costs (`resource` is no longer always the
+same cached object).
 
 ## Repository layout
 

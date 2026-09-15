@@ -7,7 +7,13 @@ import os
 import socket
 import sys
 import uuid
+from typing import Any
 from urllib.parse import unquote
+
+from ._redact import Redactor
+
+_redactor = Redactor()
+
 
 def _parse_otel_resource_attributes(raw: str) -> dict[str, str] | None:
     """key1=value1,key2=value2, percent-encoded. Whole var drops on any parse error
@@ -42,6 +48,20 @@ def _executable_basename() -> str:
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0) or "python"
     return base
+
+
+def _command_line(host_name: str | None) -> str:
+    """"how to run this again": hostname> cd <dir>; <argv, executable
+    shortened to its basename>. Human-facing, not machine-parsed — spec
+    deviation V12. Value-pattern redacted like body, since argv can carry a
+    secret (a flag value) the way any other free-form string can."""
+    try:
+        cwd = os.getcwd()
+    except OSError:
+        cwd = "?"
+    argv = list(sys.argv) or ["python"]
+    argv[0] = os.path.basename(argv[0]) or "python"
+    return _redactor.redact_value_patterns(f"{host_name or '?'}> cd {cwd}; {' '.join(argv)}")
 
 
 def _instance_id(strategy: str, k8s: dict[str, str], host_name: str | None) -> str | None:
@@ -109,6 +129,8 @@ def resolve(explicit: dict[str, object] | None = None) -> dict[str, object]:
         resource["host.name"] = host_name
     if env.get("LOG_RESOURCE_PROCESS", "1") != "0":
         resource["process.pid"] = os.getpid()
+    if env.get("LOG_RESOURCE_COMMAND", "1") != "0":
+        resource["command"] = _command_line(host_name)
     resource.update(k8s)
 
     # extra keys the user or OTEL_RESOURCE_ATTRIBUTES set, not in the known list
@@ -133,3 +155,20 @@ def get(explicit: dict[str, object] | None = None) -> dict[str, object]:
         _cached = resolve(explicit)
         _cached_pid = pid
     return _cached
+
+
+def with_request_url(resource: dict[str, object], attrs: dict[str, Any]) -> dict[str, object]:
+    """Pops http.request.method/url.full (unilog.request_scope) out of attrs
+    and, if both were present, returns a resource copy with them folded into
+    a single resource["URL"] — spec V12, same reasoning as resource.command.
+    Leaves resource/attrs untouched (returns resource as-is) when no request
+    scope is active."""
+    method = attrs.get("http.request.method")
+    url = attrs.get("url.full")
+    if not (isinstance(method, str) and isinstance(url, str)):
+        return resource
+    attrs.pop("http.request.method", None)
+    attrs.pop("url.full", None)
+    merged = dict(resource)
+    merged["URL"] = f"{method} {url}"
+    return merged

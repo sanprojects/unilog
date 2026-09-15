@@ -105,7 +105,36 @@ func Build(opt BuildOptions) Record {
 			traceID, spanID, traceFlags = fromContext(opt.Context)
 		}
 	}
+	// http.request.method/url.full (RequestScope, or set directly) fold into
+	// resource.URL instead of staying as attributes — spec V12: one
+	// glanceable "how do I reach this" field per record, same reasoning as
+	// resource.command. Checked regardless of how attributes got here (scope
+	// merge above, or passed straight in opt.Attributes) so the fold-in
+	// contract doesn't depend on Context/caller-info being active too.
+	var requestURL string
+	if method, ok := attributes["http.request.method"].(string); ok {
+		if url, ok2 := attributes["url.full"].(string); ok2 {
+			requestURL = method + " " + url
+			cp := make(map[string]any, len(attributes))
+			for k, v := range attributes {
+				cp[k] = v
+			}
+			delete(cp, "http.request.method")
+			delete(cp, "url.full")
+			attributes = cp
+		}
+	}
 	attrs, dropped := normalizeAttributes(attributes)
+
+	resource := GetResource()
+	if requestURL != "" {
+		withURL := make(Resource, len(resource)+1)
+		for k, v := range resource {
+			withURL[k] = v
+		}
+		withURL["URL"] = requestURL
+		resource = withURL
+	}
 
 	rec := Record{
 		Timestamp:        time.Now().UTC().Format("2006-01-02T15:04:05.000000Z"),
@@ -115,7 +144,7 @@ func Build(opt BuildOptions) Record {
 		TraceID:          traceID,
 		SpanID:           spanID,
 		TraceFlags:       traceFlags,
-		Resource:         GetResource(),
+		Resource:         resource,
 		Attributes:       attrs,
 		DroppedAttrCount: dropped,
 	}

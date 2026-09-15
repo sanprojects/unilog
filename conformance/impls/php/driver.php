@@ -23,11 +23,17 @@ $opts = $case['input'];
 $attributes = \Unilog\Caller::enabled() ? \Unilog\Caller::attributes() : [];
 $attributes = [...$attributes, ...($opts['attributes'] ?? [])];
 
+if (isset($opts['requestScope'])) {
+    $attributes['http.request.method'] = $opts['requestScope']['method'];
+    $attributes['url.full'] = $opts['requestScope']['url'];
+}
+$resource = \Unilog\Resource::withRequestUrl(\Unilog\Resource::get(), $attributes);
+
 $record = \Unilog\Record::build([
     'severityNumber' => $opts['severityNumber'] ?? 9,
     'body' => $opts['body'] ?? '',
     'eventName' => $opts['eventName'] ?? null,
-    'resource' => \Unilog\Resource::get(),
+    'resource' => $resource,
     'attributes' => $attributes,
     'traceId' => $opts['traceId'] ?? null,
     'spanId' => $opts['spanId'] ?? null,

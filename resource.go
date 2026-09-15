@@ -74,6 +74,28 @@ func buildInfoServiceName() string {
 	return filepath.Base(info.Main.Path)
 }
 
+// commandLine reconstructs "how to run this again": hostname> cd <dir>;
+// <argv, with the executable shortened to its basename>. Meant for a human
+// staring at a log line to know where to go, not for machine parsing — spec
+// deviation V12. Value-pattern redacted like Body, since argv can carry a
+// secret (a flag value) the way any other free-form string can.
+func commandLine(hostName string) string {
+	dir, err := os.Getwd()
+	if err != nil {
+		dir = "?"
+	}
+	args := make([]string, len(os.Args))
+	copy(args, os.Args)
+	if len(args) > 0 {
+		args[0] = filepath.Base(args[0])
+	}
+	host := hostName
+	if host == "" {
+		host = "?"
+	}
+	return globalRedactor.RedactValuePatterns(host + "> cd " + dir + "; " + strings.Join(args, " "))
+}
+
 func resolveResource(cfg ResourceConfig) Resource {
 	otelAttrs, ok := parseOTelResourceAttributes(os.Getenv("OTEL_RESOURCE_ATTRIBUTES"))
 	if !ok {
@@ -114,6 +136,9 @@ func resolveResource(cfg ResourceConfig) Resource {
 	}
 	if os.Getenv("LOG_RESOURCE_PROCESS") != "0" {
 		res["process.pid"] = os.Getpid()
+	}
+	if os.Getenv("LOG_RESOURCE_COMMAND") != "0" {
+		res["command"] = commandLine(hostName)
 	}
 	for k, v := range k8s {
 		res[k] = v

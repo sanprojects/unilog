@@ -37,11 +37,12 @@ function emitRecord(sinks, opts) {
   const enrichedAttrs = { ...context.currentScopeAttrs() };
   if (caller.enabled()) Object.assign(enrichedAttrs, caller.callerAttributes());
   Object.assign(enrichedAttrs, opts.attributes);
+  const resource = resourceMod.withRequestUrl(resourceMod.get(), enrichedAttrs);
 
   const rec = record.build({
     ...opts,
     attributes: enrichedAttrs,
-    resource: resourceMod.get(),
+    resource,
     traceId: opts.traceId || ctx.traceId,
     spanId: opts.spanId || ctx.spanId,
     traceFlags: opts.traceFlags || ctx.traceFlags,

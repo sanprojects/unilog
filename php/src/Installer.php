@@ -161,12 +161,14 @@ final class Installer
             return;
         }
         $attributes = [...Context::currentScopeAttrs(), ...$attributes];
+        $resource = Resource::withRequestUrl(Resource::get(), $attributes);
         [$traceId, $spanId, $traceFlags] = Context::current();
         $record = Record::build([
             'severityNumber' => $severityNumber,
             'body' => $body,
             'eventName' => $eventName,
             'attributes' => $attributes,
+            'resource' => $resource,
             'traceId' => $traceId,
             'spanId' => $spanId,
             'traceFlags' => $traceFlags,
