@@ -26,14 +26,43 @@ final class Redactor
     private const PII_KEY_SEGMENTS = ['email' => true, 'phone' => true, 'ip' => true, 'user_id' => true, 'name' => true];
 
     /** @var list<array{0: string, 1: string, 2: ?string}> [name, regex, prefilter] */
+    // [name, regex, prefilters, group]. A prefilter is a cheap substring test
+    // that skips the regex entirely; an array because one string cannot
+    // express "AKIA or ASIA". group masks only that capture group, so
+    // `?key=...` keeps the readable parameter name.
+    //
+    // A prefilter is matched case-SENSITIVELY unless its own regex carries the
+    // `i` modifier, which is read off the pattern rather than carried as
+    // another field. It has to be: folding case made 'AC' (twilio) match 'ac'
+    // anywhere and fire on 62% of real log lines.
     private const VALUE_PATTERNS = [
-        ['jwt', '/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b/', 'eyJ'],
-        ['bearer', '/\bbearer\s+[A-Za-z0-9._~+\/=-]{10,}/i', 'bearer'],
-        ['pem', '/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', 'PRIVATE KEY'],
-        ['aws_access_key', '/\b(AKIA|ASIA)[A-Z0-9]{16}\b/', null],
-        ['gh_token', '/\b(ghp_|gho_|ghu_|ghs_|glpat-)[A-Za-z0-9_-]{20,}\b/', null],
-        ['dsn', '#\b[a-z][a-z0-9+.-]*://[^\s:/@]+:[^\s:/@]+@[^\s/]+#', '://'],
-        ['kv_secret', '/\b(password|passwd|token|secret|api[_-]?key)\s*[=:]\s*[^\s,;&]{4,}/i', null],
+        // Query-string parameters. `key` is ambiguous in prose ("primary key")
+        // but inside ?...&key= it is a secret, so this list is wider than the
+        // key segments used for attribute names.
+        ['query_param', '/([?&](?:key|api[_-]?key|access[_-]?key|token|access[_-]?token|auth|password|passwd|secret|client[_-]?secret|sig|signature|session|sid)=)([^&\s"\'<>]{4,})/i', ['='], 2],
+        ['jwt', '/\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b/', ['eyJ'], 0],
+        ['bearer', '/\bbearer\s+[A-Za-z0-9._~+\/=-]{10,}/i', ['bearer'], 0],
+        ['pem', '/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/', ['PRIVATE KEY'], 0],
+        // Vendor-issued tokens: the prefix is fixed by the vendor, so the
+        // regex is exact and the prefilter is free. AWS and GitHub used to be
+        // one pattern over several prefixes and so ran with no prefilter.
+        ['aws_access_key', '/\b(AKIA|ASIA)[A-Z0-9]{16}\b/', ['AKIA', 'ASIA'], 0],
+        ['github_token', '/\b(ghp_|gho_|ghu_|ghs_)[A-Za-z0-9_-]{20,}\b/', ['gh'], 0],
+        ['gitlab_token', '/\bglpat-[A-Za-z0-9_-]{20,}\b/', ['glpat-'], 0],
+        ['google_api_key', '/\bAIza[0-9A-Za-z_-]{35}\b/', ['AIza'], 0],
+        ['google_oauth', '/\bya29\.[0-9A-Za-z_-]{20,}/', ['ya29.'], 0],
+        ['openai', '/\bsk-(proj-)?[A-Za-z0-9_-]{20,}\b/', ['sk-'], 0],
+        ['stripe', '/\b(sk|rk|pk)_(live|test)_[A-Za-z0-9]{16,}\b/', ['_live_', '_test_'], 0],
+        ['slack_token', '/\bxox[baprs]-[A-Za-z0-9-]{10,}\b/', ['xox'], 0],
+        ['telegram_bot_token', '/\b\d{8,10}:AA[A-Za-z0-9_-]{32,}\b/', [':AA'], 0],
+        ['sendgrid', '/\bSG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\b/', ['SG.'], 0],
+        ['twilio_sid', '/\bAC[0-9a-f]{32}\b/', ['AC'], 0],
+        ['npm_token', '/\bnpm_[A-Za-z0-9]{36}\b/', ['npm_'], 0],
+        ['digitalocean_token', '/\bdop_v1_[0-9a-f]{64}\b/', ['dop_v1_'], 0],
+        ['dsn', '#\b[a-z][a-z0-9+.-]*://[^\s:/@]+:[^\s:/@]+@[^\s/]+#', ['://'], 0],
+        // Last: the vendor patterns above are precise and have already masked
+        // what they recognise; this catches name=value with no known form.
+        ['kv_secret', '/\b(password|passwd|token|secret|api[_-]?key)\s*[=:]\s*[^\s,;&]{4,}/i', ['=', ':'], 0],
     ];
     private const PAN_RE = '/\b(?:\d[ -]*?){13,19}\b/';
 
@@ -87,10 +116,38 @@ final class Redactor
 
     private function replacement(string $match): string
     {
+        // A match that already carries the mask is left alone - see the spec's
+        // replacement.no_double_mask. PCRE has lookahead but RE2 does not, and
+        // all four implementations have to agree byte for byte.
+        if (str_contains($match, '[REDACTED')) {
+            return $match;
+        }
         if ($this->mode === 'hash' && $this->hashKey !== '') {
             return '[REDACTED:' . substr(hash_hmac('sha256', $match, $this->hashKey), 0, 16) . ']';
         }
         return '[REDACTED]';
+    }
+
+    /** Whether the pattern carries the `i` modifier (after its closing delimiter). */
+    private static function isFolded(string $regex): bool
+    {
+        $delimiter = $regex[0];
+        $end = strrpos($regex, $delimiter);
+
+        return $end !== false && str_contains(substr($regex, $end + 1), 'i');
+    }
+
+    /** @param list<string> $needles */
+    private static function containsAny(string $haystack, array $needles, bool $fold): bool
+    {
+        foreach ($needles as $needle) {
+            $found = $fold ? stripos($haystack, $needle) : strpos($haystack, $needle);
+            if ($found !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function redactValuePatterns(string $text): string
@@ -98,8 +155,31 @@ final class Redactor
         if (!$this->enabled || $text === '') {
             return $text;
         }
-        foreach (self::VALUE_PATTERNS as [$name, $regex, $prefilter]) {
-            if ($prefilter !== null && stripos($text, $prefilter) === false) {
+        foreach (self::VALUE_PATTERNS as [$name, $regex, $prefilters, $group]) {
+            if ($prefilters !== null && !self::containsAny($text, $prefilters, self::isFolded($regex))) {
+                continue;
+            }
+            if ($group > 0) {
+                // Mask only that capture group - `?key=` stays readable. Located
+                // by offset, not by searching for the group's text inside the
+                // match, so the other three implementations agree byte for byte.
+                $text = preg_replace_callback(
+                    $regex,
+                    function ($m) use ($group) {
+                        [$whole, $wholeAt] = $m[0];
+                        [$value, $valueAt] = $m[$group];
+                        if ($valueAt < 0) {
+                            return $whole;
+                        }
+                        $at = $valueAt - $wholeAt;
+
+                        return substr($whole, 0, $at) . $this->replacement($value) . substr($whole, $at + strlen($value));
+                    },
+                    $text,
+                    -1,
+                    $count,
+                    PREG_OFFSET_CAPTURE
+                ) ?? $text;
                 continue;
             }
             $text = preg_replace_callback($regex, fn ($m) => $this->replacement($m[0]), $text) ?? $text;

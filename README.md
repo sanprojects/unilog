@@ -94,6 +94,35 @@ Both are `LOG_RESOURCE_COMMAND`/redaction-covered like every other free-form str
 see [DEVIATIONS.md](spec/DEVIATIONS.md) for what that costs (`resource` is no longer always the
 same cached object).
 
+## Secrets are masked, best-effort
+
+Every free-form string in a record — body, attribute values, stack traces — is
+run through the redactor before it is written. Two independent passes:
+
+- **by attribute name**, matched on whole segments, so `cardNumber` is masked
+  and `cardinality` is not. This is the reliable half: the match is exact.
+- **by value shape**, a table of regexes in `spec/redaction.default.json`. This
+  half recognises known forms only.
+
+Recognised: JWT, `Bearer`, PEM private keys, credit-card numbers (Luhn-checked),
+DSNs with an inline password, `name=value` for a handful of secret-ish names,
+query-string parameters, and vendor tokens — AWS, GitHub, GitLab, Google (API
+key and OAuth), OpenAI, Stripe, Slack, Telegram, SendGrid, Twilio, npm,
+DigitalOcean.
+
+Query parameters keep their name: `?key=AIza...` becomes `?key=[REDACTED]`, not
+a bare `[REDACTED]`, because the name is what makes the line worth reading.
+
+**This is a safety net, not a guarantee.** A regex table cannot recognise a
+home-grown token with no distinctive shape, a password in a sentence, or a
+secret inside a serialised blob. Put anything sensitive in an *attribute* with
+an honest name and let the name-based pass handle it — do not interpolate it
+into the message text.
+
+Measured on 359k lines of production journald and 1.56M lines of source: 506 and
+3685 matches respectively, no false positives found by inspection. Redaction
+costs ~159 µs per record.
+
 ## Repository layout
 
 ```

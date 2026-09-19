@@ -1,0 +1,12 @@
+{
+  "name": "redact_vendor_tokens",
+  "note": "Fixtures are deliberately low-entropy (runs of A/1) - they keep each vendor's SHAPE so the pattern still matches, without looking like live credentials to a secret scanner. GitHub push protection rejected the first version of this file.",
+  "input": {
+    "severityNumber": 9,
+    "body": "google AIzaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA openai sk-proj-AAAAAAAAAAAAAAAAAAAA slack xoxb-AAAAAAAAAAAAAAAA stripe sk_live_AAAAAAAAAAAAAAAA telegram 1111111111:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA gitlab glpat-AAAAAAAAAAAAAAAAAAAA aws AKIAAAAAAAAAAAAAAAAA",
+    "attributes": {
+      "plain_text": "the primary key of the table is id",
+      "sha_not_twilio": "ac1b2c3d4e5f60718293a4b5c6d7e8f901234567"
+    }
+  }
+}

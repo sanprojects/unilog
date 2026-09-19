@@ -1,0 +1,10 @@
+{
+  "name": "redact_query_param",
+  "input": {
+    "severityNumber": 9,
+    "body": "GET https://maps.googleapis.com/maps/api/geocode/json?key=SOMEOPAQUEVALUE123&address=Nicosia then /page?id=12345&sort=name",
+    "attributes": {
+      "url": "https://api.example.com/v1/items?token=OPAQUE0123456789&page=2"
+    }
+  }
+}
