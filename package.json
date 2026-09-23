@@ -1,6 +1,6 @@
 {
   "name": "unilog",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-config OTel-shaped structured logging for Node.js, Bun and the browser.",
   "license": "MIT",
   "repository": "github:sanprojects/unilog",
