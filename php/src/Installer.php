@@ -73,8 +73,16 @@ final class Installer
      * reinstalling — they're inherited — but calling this is harmless. */
     public static function reinstallForWorker(): void
     {
-        self::$installed = false;
-        self::install();
+        if (!self::$installed) {
+            self::install();
+            return;
+        }
+        // Sinks only. Pushing the handlers a second time made
+        // $prevErrorHandler our own first closure, so errorHandler() called
+        // itself until memory ran out - one trigger_error() after this, run
+        // on PHP 8.4, was 250,405 records and a fatal.
+        $serviceName = (string) (Resource::get()['service.name'] ?? 'unilog');
+        self::$sinks = new Sinks($serviceName);
     }
 
     private static function debug(): bool
