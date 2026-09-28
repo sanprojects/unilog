@@ -234,7 +234,11 @@ final class Record
     public static function toJsonLine(array $record): string
     {
         $asciiOnly = getenv('LOG_ASCII_ONLY') === '1';
-        $flags = \JSON_UNESCAPED_SLASHES | ($asciiOnly ? 0 : \JSON_UNESCAPED_UNICODE);
+        // Invalid UTF-8 becomes U+FFFD, as Go's encoding/json does, instead of
+        // costing the whole record: a request for /%c0 put a raw 0xC0 byte in a
+        // message, and all that reached the journal was the fallback below.
+        $flags = \JSON_UNESCAPED_SLASHES | \JSON_INVALID_UTF8_SUBSTITUTE
+            | ($asciiOnly ? 0 : \JSON_UNESCAPED_UNICODE);
         $json = json_encode($record, $flags);
         if ($json === false) {
             $json = json_encode([
