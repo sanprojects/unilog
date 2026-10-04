@@ -24,6 +24,9 @@ request_scope = opts.get("requestScope")
 if request_scope:
     attributes["http.request.method"] = request_scope["method"]
     attributes["url.full"] = request_scope["url"]
+    if request_scope.get("clientAddress"):
+        attributes["client.address"] = request_scope["clientAddress"]
+        attributes["client.port"] = request_scope.get("clientPort")
 resource = _resource.with_request_url(_resource.get(), attributes)
 
 rec = _record.build(

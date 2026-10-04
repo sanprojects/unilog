@@ -51,7 +51,7 @@ def _executable_basename() -> str:
 
 
 def _command_line(host_name: str | None) -> str:
-    """"how to run this again": hostname> cd <dir>; <argv, executable
+    """"how to run this again": user@hostname> cd <dir>; <argv, executable
     shortened to its basename>. Human-facing, not machine-parsed — spec
     deviation V12. Value-pattern redacted like body, since argv can carry a
     secret (a flag value) the way any other free-form string can."""
@@ -61,7 +61,12 @@ def _command_line(host_name: str | None) -> str:
         cwd = "?"
     argv = list(sys.argv) or ["python"]
     argv[0] = os.path.basename(argv[0]) or "python"
-    return _redactor.redact_value_patterns(f"{host_name or '?'}> cd {cwd}; {' '.join(argv)}")
+    try:
+        import getpass
+        user = getpass.getuser()
+    except Exception:
+        user = ""
+    return _redactor.redact_value_patterns(f"{user + '@' if user else ''}{host_name or '?'}> cd {cwd}; {' '.join(argv)}")
 
 
 def _instance_id(strategy: str, k8s: dict[str, str], host_name: str | None) -> str | None:
@@ -173,6 +178,11 @@ def with_request_url(resource: dict[str, object], attrs: dict[str, Any]) -> dict
         return resource
     attrs.pop("http.request.method", None)
     attrs.pop("url.full", None)
+    addr = attrs.pop("client.address", None)
+    port = attrs.pop("client.port", None)
+    frm = ""
+    if isinstance(addr, str) and addr:
+        frm = f" from {'[' + addr + ']' if ':' in addr else addr}" + (f":{port}" if port not in (None, "") else "")
     merged = dict(resource)
-    merged["URL"] = f"{method} {url}"
+    merged["URL"] = f"{method} {url}{frm}"
     return merged

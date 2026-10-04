@@ -80,9 +80,16 @@ final class Context
     }
 
     /** with-style helper for an HTTP request: */
-    public static function withRequestScope(string $method, string $url, callable $fn): mixed
+    public static function withRequestScope(string $method, string $url, callable $fn, ?string $clientAddress = null, ?int $clientPort = null): mixed
     {
-        return self::withScope(['http.request.method' => $method, 'url.full' => $url], $fn);
+        $attrs = ['http.request.method' => $method, 'url.full' => $url];
+        if ($clientAddress !== null && $clientAddress !== '') {
+            $attrs['client.address'] = $clientAddress;
+            if ($clientPort !== null) {
+                $attrs['client.port'] = $clientPort;
+            }
+        }
+        return self::withScope($attrs, $fn);
     }
 
     /** with-style helper for a background job/worker: */

@@ -57,7 +57,13 @@ function middleware() {
         traceId: tp ? tp.traceId : undefined,
         spanId: tp ? tp.spanId : undefined,
         traceFlags: tp ? tp.traceFlags : undefined,
-        attrs: { 'http.request.method': req.method, 'url.full': fullRequestUrl(req) },
+        attrs: {
+          'http.request.method': req.method,
+          'url.full': fullRequestUrl(req),
+          ...(req.socket && req.socket.remoteAddress
+            ? { 'client.address': req.socket.remoteAddress, 'client.port': req.socket.remotePort }
+            : {}),
+        },
       },
       next
     );

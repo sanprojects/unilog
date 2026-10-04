@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"os/user"
 	"path/filepath"
 	"runtime/debug"
 	"strconv"
@@ -74,7 +75,7 @@ func buildInfoServiceName() string {
 	return filepath.Base(info.Main.Path)
 }
 
-// commandLine reconstructs "how to run this again": hostname> cd <dir>;
+// commandLine reconstructs "how to run this again": user@hostname> cd <dir>;
 // <argv, with the executable shortened to its basename>. Meant for a human
 // staring at a log line to know where to go, not for machine parsing — spec
 // deviation V12. Value-pattern redacted like Body, since argv can carry a
@@ -93,7 +94,11 @@ func commandLine(hostName string) string {
 	if host == "" {
 		host = "?"
 	}
-	return globalRedactor.RedactValuePatterns(host + "> cd " + dir + "; " + strings.Join(args, " "))
+	prefix := ""
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		prefix = u.Username + "@"
+	}
+	return globalRedactor.RedactValuePatterns(prefix + host + "> cd " + dir + "; " + strings.Join(args, " "))
 }
 
 func resolveResource(cfg ResourceConfig) Resource {
@@ -113,10 +118,10 @@ func resolveResource(cfg ResourceConfig) Resource {
 
 	k8s := map[string]string{}
 	for attr, envVar := range map[string]string{
-		"k8s.namespace.name":  "K8S_NAMESPACE",
-		"k8s.pod.name":        "K8S_POD_NAME",
-		"k8s.container.name":  "K8S_CONTAINER_NAME",
-		"k8s.node.name":       "K8S_NODE_NAME",
+		"k8s.namespace.name": "K8S_NAMESPACE",
+		"k8s.pod.name":       "K8S_POD_NAME",
+		"k8s.container.name": "K8S_CONTAINER_NAME",
+		"k8s.node.name":      "K8S_NODE_NAME",
 	} {
 		if v := os.Getenv(envVar); v != "" {
 			k8s[attr] = v

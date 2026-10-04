@@ -26,6 +26,10 @@ $attributes = [...$attributes, ...($opts['attributes'] ?? [])];
 if (isset($opts['requestScope'])) {
     $attributes['http.request.method'] = $opts['requestScope']['method'];
     $attributes['url.full'] = $opts['requestScope']['url'];
+    if (!empty($opts['requestScope']['clientAddress'])) {
+        $attributes['client.address'] = $opts['requestScope']['clientAddress'];
+        $attributes['client.port'] = $opts['requestScope']['clientPort'] ?? null;
+    }
 }
 $resource = \Unilog\Resource::withRequestUrl(\Unilog\Resource::get(), $attributes);
 

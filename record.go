@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -115,12 +116,29 @@ func Build(opt BuildOptions) Record {
 	if method, ok := attributes["http.request.method"].(string); ok {
 		if url, ok2 := attributes["url.full"].(string); ok2 {
 			requestURL = method + " " + url
+			if addr, ok3 := attributes["client.address"].(string); ok3 && addr != "" {
+				host := addr
+				if strings.Contains(addr, ":") {
+					host = "[" + addr + "]"
+				}
+				requestURL += " from " + host
+				switch p := attributes["client.port"].(type) {
+				case int:
+					requestURL += ":" + strconv.Itoa(p)
+				case string:
+					if p != "" {
+						requestURL += ":" + p
+					}
+				}
+			}
 			cp := make(map[string]any, len(attributes))
 			for k, v := range attributes {
 				cp[k] = v
 			}
 			delete(cp, "http.request.method")
 			delete(cp, "url.full")
+			delete(cp, "client.address")
+			delete(cp, "client.port")
 			attributes = cp
 		}
 	}

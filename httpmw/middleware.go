@@ -10,8 +10,10 @@ package httpmw
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 
 	"github.com/sanprojects/unilog"
 )
@@ -29,7 +31,12 @@ func Middleware(next http.Handler) http.Handler {
 				ctx = unilog.WithTrace(ctx, traceID, spanID, flags)
 			}
 		}
-		ctx = unilog.RequestScope(ctx, r.Method, fullRequestURL(r))
+		clientAddr, clientPort := "", 0
+		if h, p, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+			clientAddr = h
+			clientPort, _ = strconv.Atoi(p)
+		}
+		ctx = unilog.RequestScope(ctx, r.Method, fullRequestURL(r), clientAddr, clientPort)
 		r = r.WithContext(ctx)
 
 		defer func() {

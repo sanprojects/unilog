@@ -53,8 +53,15 @@ final class Resource
         if (!is_string($method) || !is_string($url)) {
             return $resource;
         }
-        unset($attributes['http.request.method'], $attributes['url.full']);
-        $resource['URL'] = $method . ' ' . $url;
+        $addr = $attributes['client.address'] ?? null;
+        $port = $attributes['client.port'] ?? null;
+        unset($attributes['http.request.method'], $attributes['url.full'], $attributes['client.address'], $attributes['client.port']);
+        $from = '';
+        if (is_string($addr) && $addr !== '') {
+            $host = str_contains($addr, ':') ? '[' . $addr . ']' : $addr;
+            $from = ' from ' . $host . (is_int($port) || (is_string($port) && $port !== '') ? ':' . $port : '');
+        }
+        $resource['URL'] = $method . ' ' . $url . $from;
         return $resource;
     }
 
@@ -87,7 +94,7 @@ final class Resource
         return basename((string) $script) ?: 'php';
     }
 
-    /** "how to run this again": hostname> cd <dir>; <argv, executable
+    /** "how to run this again": user@hostname> cd <dir>; <argv, executable
      * shortened to its basename>. Human-facing, not machine-parsed — spec
      * deviation V12. Value-pattern redacted like body, since argv can carry
      * a secret (a flag value) the way any other free-form string can. */
@@ -103,7 +110,9 @@ final class Resource
         } else {
             $cmd = basename(PHP_SAPI === 'cli' ? PHP_BINARY : (PHP_SAPI ?: 'php'));
         }
-        return (new Redactor())->redactValuePatterns(($hostName ?: '?') . '> cd ' . $cwd . '; ' . $cmd);
+        $user = function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? null) : null;
+        $user ??= get_current_user() ?: getenv('USER') ?: null;
+        return (new Redactor())->redactValuePatterns(($user ? $user . '@' : '') . ($hostName ?: '?') . '> cd ' . $cwd . '; ' . $cmd);
     }
 
     private static function composerServiceName(): ?string

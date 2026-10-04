@@ -27,8 +27,10 @@ type caseFile struct {
 		TraceID        string         `json:"traceId"`
 		SpanID         string         `json:"spanId"`
 		RequestScope   *struct {
-			Method string `json:"method"`
-			URL    string `json:"url"`
+			Method        string `json:"method"`
+			URL           string `json:"url"`
+			ClientAddress string `json:"clientAddress"`
+			ClientPort    int    `json:"clientPort"`
 		} `json:"requestScope"`
 	} `json:"input"`
 }
@@ -74,7 +76,7 @@ func main() {
 		SpanID:         c.Input.SpanID,
 	}
 	if rs := c.Input.RequestScope; rs != nil {
-		opts.Context = unilog.RequestScope(context.Background(), rs.Method, rs.URL)
+		opts.Context = unilog.RequestScope(context.Background(), rs.Method, rs.URL, rs.ClientAddress, rs.ClientPort)
 	}
 	rec := unilog.Build(opts)
 	os.Stdout.Write(rec.JSONLine())

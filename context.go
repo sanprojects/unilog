@@ -46,8 +46,21 @@ func WithScope(ctx context.Context, attrs map[string]any) context.Context {
 // RequestScope is WithScope pre-filled for an HTTP request:
 //
 //	ctx = unilog.RequestScope(ctx, r.Method, r.URL.String())
-func RequestScope(ctx context.Context, method, url string) context.Context {
-	return WithScope(ctx, map[string]any{"http.request.method": method, "url.full": url})
+//
+// Optional trailing args: client address, then client port (0 = unknown).
+func RequestScope(ctx context.Context, method, url string, client ...any) context.Context {
+	attrs := map[string]any{"http.request.method": method, "url.full": url}
+	if len(client) > 0 {
+		if a, ok := client[0].(string); ok && a != "" {
+			attrs["client.address"] = a
+			if len(client) > 1 {
+				if p, ok := client[1].(int); ok && p > 0 {
+					attrs["client.port"] = p
+				}
+			}
+		}
+	}
+	return WithScope(ctx, attrs)
 }
 
 // WorkerScope is WithScope pre-filled for a background job:

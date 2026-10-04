@@ -57,9 +57,14 @@ def scope(**attrs: Any) -> Iterator[None]:
         scope_attrs_var.reset(token)
 
 
-def request_scope(method: str, url: str):
-    """with unilog.request_scope('POST', '/v1/payments/42'): ..."""
-    return scope(**{"http.request.method": method, "url.full": url})
+def request_scope(method: str, url: str, client_address: str | None = None, client_port: int | None = None):
+    """with unilog.request_scope('POST', '/v1/payments/42', '203.0.113.7', 51234): ..."""
+    attrs: dict[str, Any] = {"http.request.method": method, "url.full": url}
+    if client_address:
+        attrs["client.address"] = client_address
+        if client_port is not None:
+            attrs["client.port"] = client_port
+    return scope(**attrs)
 
 
 def worker_scope(path: str, **attrs: Any):

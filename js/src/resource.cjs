@@ -10,7 +10,7 @@ const { Redactor } = require('./redact.cjs');
 
 const redactor = new Redactor();
 
-// commandLine reconstructs "how to run this again": hostname> cd <dir>;
+// commandLine reconstructs "how to run this again": user@hostname> cd <dir>;
 // <argv, executable shortened to its basename>. Human-facing, not
 // machine-parsed — spec deviation V12. Value-pattern redacted like body,
 // since argv can carry a secret (a flag value) the way any other free-form
@@ -24,7 +24,13 @@ function commandLine(hostName) {
   }
   const argv = process.argv.slice(1);
   argv.unshift(path.basename(process.argv[0] || (typeof Bun !== 'undefined' ? 'bun' : 'node')));
-  return redactor.redactValuePatterns(`${hostName || '?'}> cd ${cwd}; ${argv.join(' ')}`);
+  let user = '';
+  try {
+    user = require('os').userInfo().username;
+  } catch {
+    user = process.env.USER || '';
+  }
+  return redactor.redactValuePatterns(`${user ? user + '@' : ''}${hostName || '?'}> cd ${cwd}; ${argv.join(' ')}`);
 }
 
 function parseOtelResourceAttributes(raw) {
@@ -171,7 +177,15 @@ function withRequestUrl(resource, attrs) {
   if (typeof method !== 'string' || typeof url !== 'string') return resource;
   delete attrs['http.request.method'];
   delete attrs['url.full'];
-  return { ...resource, URL: `${method} ${url}` };
+  const addr = attrs['client.address'];
+  const port = attrs['client.port'];
+  delete attrs['client.address'];
+  delete attrs['client.port'];
+  let from = '';
+  if (typeof addr === 'string' && addr) {
+    from = ` from ${addr.includes(':') ? `[${addr}]` : addr}${port !== undefined && port !== '' ? `:${port}` : ''}`;
+  }
+  return { ...resource, URL: `${method} ${url}${from}` };
 }
 
 module.exports = { resolve, get, configure, withRequestUrl };

@@ -24,6 +24,10 @@ Object.assign(attributes, opts.attributes);
 if (opts.requestScope) {
   attributes['http.request.method'] = opts.requestScope.method;
   attributes['url.full'] = opts.requestScope.url;
+  if (opts.requestScope.clientAddress) {
+    attributes['client.address'] = opts.requestScope.clientAddress;
+    attributes['client.port'] = opts.requestScope.clientPort;
+  }
 }
 const resource = resourceMod.withRequestUrl(resourceMod.get(), attributes);
 
